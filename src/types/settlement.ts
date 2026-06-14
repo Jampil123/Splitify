@@ -32,7 +32,7 @@ export interface Settlement {
 export interface MarkSettlementData {
   settlementId: string;
   groupId: string;
-  paymentMethod?: Settlement['paymentMethod'];
+  paymentMethod?: 'cash' | 'bank_transfer' | 'gcash' | 'maya' | 'other';
   transactionReference?: string;
   note?: string;
 }
