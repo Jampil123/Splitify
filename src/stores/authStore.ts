@@ -1,4 +1,3 @@
-import { getCurrentUserData, logoutUser } from '@/services/firebase/auth';
 import { User } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
@@ -25,37 +24,51 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       // Initial state
       user: null,
-      isLoading: false,
+      isLoading: true, // Start as true to prevent premature navigation
       error: null,
       isAuthenticated: false,
 
       // Actions
-      setUser: (user) => set({ user, isAuthenticated: !!user }),
+      setUser: (user) => {
+        console.log('🔐 AuthStore: setUser called', user?.id || 'null');
+        set({ 
+          user, 
+          isAuthenticated: !!user,
+          isLoading: false 
+        });
+      },
       
-      setLoading: (isLoading) => set({ isLoading }),
+      setLoading: (isLoading) => {
+        console.log('🔐 AuthStore: setLoading', isLoading);
+        set({ isLoading });
+      },
       
       setError: (error) => set({ error }),
       
       logout: async () => {
+        console.log('🔐 AuthStore: logout called');
         set({ isLoading: true });
         try {
+          const { logoutUser } = await import('@/services/firebase/auth');
           await logoutUser();
-          set({ user: null, isAuthenticated: false, error: null });
+          set({ user: null, isAuthenticated: false, error: null, isLoading: false });
         } catch (error: any) {
-          set({ error: error.message });
-        } finally {
-          set({ isLoading: false });
+          console.error('Logout error:', error);
+          set({ error: error.message, isLoading: false });
         }
       },
       
       refreshUserData: async (userId: string) => {
+        console.log('🔐 AuthStore: refreshUserData called for', userId);
         set({ isLoading: true });
         try {
+          const { getCurrentUserData } = await import('@/services/firebase/auth');
           const userData = await getCurrentUserData(userId);
           if (userData) {
             set({ user: userData, isAuthenticated: true });
           }
         } catch (error: any) {
+          console.error('Refresh user data error:', error);
           set({ error: error.message });
         } finally {
           set({ isLoading: false });
@@ -63,7 +76,8 @@ export const useAuthStore = create<AuthState>()(
       },
       
       clearAuth: () => {
-        set({ user: null, isAuthenticated: false, error: null });
+        console.log('🔐 AuthStore: clearAuth called');
+        set({ user: null, isAuthenticated: false, error: null, isLoading: false });
       },
     }),
     {
