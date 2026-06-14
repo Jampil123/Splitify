@@ -49,4 +49,6 @@ export interface CreateNotificationData {
   relatedUserId?: string;
   expenseId?: string;
   settlementId?: string;
+
+  
 }
