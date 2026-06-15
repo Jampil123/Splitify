@@ -27,18 +27,21 @@ interface MenuItemProps {
     onPress: () => void;
     showArrow?: boolean;
     badge?: number;
+    variant?: 'default' | 'destructive';
 }
 
-function MenuItem({ icon, title, subtitle, onPress, showArrow = true, badge }: MenuItemProps) {
+function MenuItem({ icon, title, subtitle, onPress, showArrow = true, badge, variant = 'default' }: MenuItemProps) {
+    const isDestructive = variant === 'destructive';
+    
     return (
-        <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
-            <View style={styles.menuIconContainer}>
-                <Ionicons name={icon as any} size={22} color={colors.primary} />
+        <TouchableOpacity style={[styles.menuItem, isDestructive && styles.menuItemDestructive]} onPress={onPress} activeOpacity={0.7}>
+            <View style={[styles.menuIconContainer, isDestructive && styles.menuIconContainerDestructive]}>
+                <Ionicons name={icon as any} size={22} color={isDestructive ? colors.error : colors.primary} />
             </View>
             <View style={styles.menuContent}>
-                <Text style={[typographyStyles.bodyMedium, styles.menuTitle]}>{title}</Text>
+                <Text style={[typographyStyles.bodyMedium, styles.menuTitle, isDestructive && styles.menuTitleDestructive]}>{title}</Text>
                 {subtitle && (
-                    <Text style={[typographyStyles.bodySmall, styles.menuSubtitle]}>{subtitle}</Text>
+                    <Text style={[typographyStyles.bodySmall, styles.menuSubtitle, isDestructive && styles.menuSubtitleDestructive]}>{subtitle}</Text>
                 )}
             </View>
             {badge && (
@@ -47,7 +50,7 @@ function MenuItem({ icon, title, subtitle, onPress, showArrow = true, badge }: M
                 </View>
             )}
             {showArrow && (
-                <Ionicons name="chevron-forward-outline" size={20} color={colors.outline} />
+                <Ionicons name="chevron-forward-outline" size={20} color={isDestructive ? colors.error : colors.outline} />
             )}
         </TouchableOpacity>
     );
@@ -337,6 +340,7 @@ export default function ProfileScreen() {
                         subtitle="Sign out of your account"
                         onPress={handleLogout}
                         showArrow={false}
+                        variant="destructive"
                     />
                 </View>
 
@@ -515,6 +519,19 @@ const styles = StyleSheet.create({
         fontSize: 10,
         color: colors.onError,
         fontWeight: 'bold',
+    },
+    menuItemDestructive: {
+        backgroundColor: 'rgba(245, 67, 54, 0.05)',
+    },
+    menuIconContainerDestructive: {
+        backgroundColor: 'rgba(245, 67, 54, 0.15)',
+    },
+    menuTitleDestructive: {
+        color: colors.error,
+    },
+    menuSubtitleDestructive: {
+        color: colors.error,
+        opacity: 0.7,
     },
     switchItem: {
         flexDirection: 'row',
