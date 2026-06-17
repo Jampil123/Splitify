@@ -124,17 +124,6 @@ export default function AddFriendScreen() {
     return (
         <View style={styles.container}>
             <StatusBar style="dark" />
-            
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back-outline" size={24} color={colors.onSurface} />
-                </TouchableOpacity>
-                <Text style={[typographyStyles.headlineMedium, styles.headerTitle]}>
-                    Add Friends
-                </Text>
-                <View style={styles.placeholder} />
-            </View>
 
             {/* Search Section */}
             <View style={styles.searchSection}>

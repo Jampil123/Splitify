@@ -4,6 +4,7 @@ export const colors = {
     primaryContainer: '#7FA6B8',
     primaryFixed: '#C0E9FC',
     primaryFixedDim: '#A5CCDF',
+    OnPrimaryContainer: '#FFFFFF',
     onPrimary: '#FFFFFF',
     onPrimaryFixed: '#001F29',
     onPrimaryFixedVariant: '#244C5B',

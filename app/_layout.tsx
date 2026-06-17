@@ -8,10 +8,9 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 export default function RootLayout() {
-    const { setUser, setLoading } = useAuthStore();
+    const { setUser, setLoading, isAuthenticated, isLoading: authIsLoading } = useAuthStore();
     const [isAuthChecked, setIsAuthChecked] = useState(false);
 
-    // Load Google Fonts
     const [fontsLoaded] = useFonts({
         Inter_400Regular,
         Inter_500Medium,
@@ -20,42 +19,37 @@ export default function RootLayout() {
         Inter_800ExtraBold,
     });
 
-    // Check authentication state on mount
     useEffect(() => {
-        console.log('🔐 RootLayout: Setting up auth listener');
         
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-            console.log('🔐 RootLayout: Auth state changed', firebaseUser?.uid || 'No user');
             
             if (firebaseUser) {
-                // Fetch user data from Firestore
                 try {
                     const userData = await getCurrentUserData(firebaseUser.uid);
-                    console.log('🔐 RootLayout: User data fetched', userData?.id);
                     setUser(userData);
                 } catch (error) {
                     console.error('Error fetching user data:', error);
                     setUser(null);
                 }
             } else {
-                console.log('🔐 RootLayout: No user, clearing auth');
                 setUser(null);
             }
+            setLoading(false);
             setIsAuthChecked(true);
         });
 
         return () => {
-            console.log('🔐 RootLayout: Cleaning up auth listener');
             unsubscribe();
         };
     }, []);
 
-    // Show loading screen while fonts load or auth checks
-    if (!fontsLoaded || !isAuthChecked) {
+    if (!fontsLoaded || !isAuthChecked || authIsLoading) {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
                 <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={{ marginTop: 10, color: colors.outline }}>Loading...</Text>
+                <Text style={{ marginTop: 10, color: colors.outline, fontFamily: 'Inter_400Regular' }}>
+                    Loading...
+                </Text>
             </View>
         );
     }
@@ -77,7 +71,7 @@ export default function RootLayout() {
                 },
             }}
         >
-            {/* Splash Screen - No Header */}
+            {/* Splash Screen */}
             <Stack.Screen 
                 name="index" 
                 options={{ 
@@ -86,7 +80,7 @@ export default function RootLayout() {
                 }} 
             />
             
-            {/* Auth Screens - No Header */}
+            {/* Auth Screens */}
             <Stack.Screen 
                 name="(auth)" 
                 options={{ 
@@ -95,7 +89,7 @@ export default function RootLayout() {
                 }} 
             />
             
-            {/* Main Tabs - No Header */}
+            {/* Main Tabs */}
             <Stack.Screen 
                 name="(tabs)" 
                 options={{ 
@@ -104,14 +98,76 @@ export default function RootLayout() {
                 }} 
             />
             
-            {/* Group Screens */}
             <Stack.Screen 
-                name="groups" 
+                name="groups/create" 
+                options={{ 
+                    headerShown: false,
+                    presentation: 'modal',
+                }} 
+            />
+            
+            <Stack.Screen 
+                name="groups/[id]" 
+                options={{ 
+                    headerShown: false,
+                }} 
+            />
+
+            <Stack.Screen 
+                name="groups/[id]/expenses/add" 
+                options={{ 
+                    headerShown: false,  
+                    presentation: 'modal',
+                }} 
+            />
+
+            <Stack.Screen 
+                name="(friends)" 
+                options={{ 
+                    headerShown: false,
+                }} 
+            />
+
+            <Stack.Screen 
+                name="groups/[id]/members/add" 
+                options={{ 
+                    headerShown: false,
+                }} 
+            />
+
+            <Stack.Screen 
+                name="groups/[id]/balances" 
                 options={{ 
                     headerShown: false,
                     animation: 'slide_from_right',
                 }} 
             />
+
+            <Stack.Screen 
+                name="groups/[id]/expenses/[expenseId]" 
+                options={{ 
+                    headerShown: false,
+                    animation: 'slide_from_right',
+                }} 
+            />
+
+            <Stack.Screen 
+                name="groups/[id]/expenses/expenseId/edit" 
+                options={{ 
+                    headerShown: false,
+                    presentation: 'modal',
+                    animation: 'slide_from_bottom',
+                }} 
+            />
+
+            <Stack.Screen 
+                name="groups/[id]/settlements" 
+                options={{ 
+                    headerShown: false,
+                    animation: 'slide_from_right',
+                }} 
+            />
+            
         </Stack>
     );
 }

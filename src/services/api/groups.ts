@@ -1,18 +1,14 @@
 import {
-    arrayRemove,
-    arrayUnion,
-    collection,
-    db,
-    doc,
-    getDoc,
-    getDocs,
-    orderBy,
-    query,
-    serverTimestamp,
-    setDoc,
-    Timestamp,
-    updateDoc,
-    where
+  arrayRemove,
+  arrayUnion,
+  collection,
+  db,
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+  Timestamp,
+  updateDoc
 } from '../firebase/config';
 
 import { CreateGroupData, Group, GroupMember, UpdateGroupData } from '@/types';
@@ -121,20 +117,47 @@ export async function getGroup(groupId: string): Promise<Group | null> {
  * Get all groups for a user
  */
 export async function getUserGroups(userId: string): Promise<Group[]> {
-  try {
-    const groupsRef = collection(db, 'groups');
-    const q = query(
-      groupsRef,
-      where('members', 'array-contains', { userId }),
-      orderBy('lastActivityAt', 'desc')
-    );
-    
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Group);
-  } catch (error) {
-    console.error('Error getting user groups:', error);
-    return [];
-  }
+    try {
+        // First, get the user document to get the groups array
+        const userRef = doc(db, 'users', userId);
+        const userSnap = await getDoc(userRef);
+        
+        if (!userSnap.exists()) {
+            console.log('User document not found for:', userId);
+            return [];
+        }
+        
+        const userData = userSnap.data();
+        const groupIds = userData.groups || [];
+        
+        if (groupIds.length === 0) {
+            console.log('No groups array found for user');
+            return [];
+        }
+        
+        // Fetch each group by ID
+        const groups: Group[] = [];
+        for (const groupId of groupIds) {
+            const groupRef = doc(db, 'groups', groupId);
+            const groupSnap = await getDoc(groupRef);
+            if (groupSnap.exists()) {
+                groups.push({ id: groupSnap.id, ...groupSnap.data() } as Group);
+            }
+        }
+        
+        // Sort by createdAt descending
+        groups.sort((a, b) => {
+            const dateA = a.createdAt?.toDate?.() || new Date(0);
+            const dateB = b.createdAt?.toDate?.() || new Date(0);
+            return dateB.getTime() - dateA.getTime();
+        });
+        
+        return groups;
+        
+    } catch (error) {
+        console.error('Error getting user groups:', error);
+        return [];
+    }
 }
 
 /**

@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useState } from 'react';
+
 import {
     ActivityIndicator,
     Alert,
@@ -101,20 +102,19 @@ export default function HomeScreen() {
     }, [fetchGroups]);
 
     const handleCreateGroup = () => {
-        
+        router.push('/groups/create');
     };
 
     const handleGroupPress = (groupId: string) => {
-        // router.push(`/groups/${groupId}`);
+        router.push({pathname: '/groups/[id]', params: { id: groupId }});
     };
 
     const handleSearch = () => {
-        // TODO: Implement search functionality
         Alert.alert('Search', 'Search functionality coming soon');
     };
 
     const handleProfilePress = () => {
-        // router.push('/(tabs)/profile');
+        router.push('/(tabs)/profile');
     };
 
     const renderEmptyState = () => (

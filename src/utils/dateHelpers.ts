@@ -113,3 +113,48 @@ export function formatRelativeTime(date: Date): string {
     
     return `${diffInDays}d ago`;
 }
+
+/**
+ * Convert any date value to a JavaScript Date object
+ * Handles Firestore Timestamp, string, number, and Date
+ */
+export function toDateObject(dateValue: any): Date {
+    if (!dateValue) return new Date();
+    
+    // Check if it's a Firestore Timestamp (has toDate method)
+    if (dateValue && typeof dateValue === 'object' && 'toDate' in dateValue) {
+        try {
+            const result = dateValue.toDate();
+            if (!isNaN(result.getTime())) return result;
+        } catch {
+            // Fall through
+        }
+    }
+    
+    // Check if it's a Date object
+    if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
+        return dateValue;
+    }
+    
+    // Check if it's a string or number
+    if (typeof dateValue === 'string' || typeof dateValue === 'number') {
+        try {
+            const result = new Date(dateValue);
+            if (!isNaN(result.getTime())) return result;
+        } catch {
+            // Fall through
+        }
+    }
+    
+    // Fallback
+    return new Date();
+}
+
+/**
+ * Format date to YYYY-MM-DD string for input fields
+ */
+export function formatDateInput(dateValue: any): string {
+    const dateObj = toDateObject(dateValue);
+    if (isNaN(dateObj.getTime())) return '';
+    return dateObj.toISOString().split('T')[0];
+}

@@ -27,6 +27,7 @@ export default function AuthLayout() {
                 options={{ 
                     title: '',
                     headerBackVisible: false,
+                    headerShown: false,
                 }} 
             />
             <Stack.Screen 
@@ -34,6 +35,7 @@ export default function AuthLayout() {
                 options={{ 
                     title: 'Create Account',
                     headerBackVisible: true,
+                    headerShown: false,
                 }} 
             />
             <Stack.Screen 
@@ -41,6 +43,7 @@ export default function AuthLayout() {
                 options={{ 
                     title: 'Reset Password',
                     headerBackVisible: true,
+                    headerShown: false,
                 }} 
             />
         </Stack>

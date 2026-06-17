@@ -15,6 +15,7 @@ export interface GroupMember {
 }
 
 export interface Group {
+  expenses?: any[];
   id: string;
   groupName: string;
   groupDescription?: string;
