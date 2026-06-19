@@ -1,7 +1,10 @@
 ﻿import { deleteGroup, updateGroup } from '@/services/api/groups';
+import { db } from '@/services/firebase/config';
+import { uploadGroupPhoto } from '@/services/supabase';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { doc, getDoc } from 'firebase/firestore';
@@ -9,6 +12,7 @@ import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Image,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -18,7 +22,6 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { db } from '@/services/firebase/config';
 
 export default function GroupSettingsScreen() {
     const router = useRouter();
@@ -29,9 +32,11 @@ export default function GroupSettingsScreen() {
     const [description, setDescription] = useState('');
     const [originalName, setOriginalName] = useState('');
     const [originalDescription, setOriginalDescription] = useState('');
+    const [groupPhoto, setGroupPhoto] = useState<string | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
     useEffect(() => {
         const fetchGroup = async () => {
@@ -45,6 +50,7 @@ export default function GroupSettingsScreen() {
                     setOriginalName(data.groupName || '');
                     setDescription(data.groupDescription || '');
                     setOriginalDescription(data.groupDescription || '');
+                    setGroupPhoto(data.groupPhoto || null);
                     setIsAdmin(data.createdBy === user?.id);
                 } else {
                     Alert.alert('Error', 'Group not found');
@@ -83,6 +89,37 @@ export default function GroupSettingsScreen() {
             }
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handlePhotoPress = async () => {
+        if (!isAdmin) return;
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission needed', 'Please allow access to your photo library.');
+            return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: 'images' as any,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+        });
+        if (result.canceled || !result.assets[0]) return;
+
+        setIsUploadingPhoto(true);
+        try {
+            const photoURL = await uploadGroupPhoto(groupId, result.assets[0].uri);
+            if (!photoURL) {
+                Alert.alert('Upload failed', 'Could not upload photo. Please try again.');
+                return;
+            }
+            await updateGroup(groupId, { groupPhoto: photoURL } as any);
+            setGroupPhoto(photoURL);
+        } catch {
+            Alert.alert('Error', 'Something went wrong while uploading the photo.');
+        } finally {
+            setIsUploadingPhoto(false);
         }
     };
 
@@ -157,20 +194,32 @@ export default function GroupSettingsScreen() {
                 {/* Group Avatar */}
                 <View style={styles.avatarSection}>
                     <View style={styles.avatarContainer}>
-                        <View style={styles.avatar}>
-                            <Text style={styles.avatarText}>
-                                {groupName.charAt(0).toUpperCase() || 'G'}
-                            </Text>
-                        </View>
-                        <TouchableOpacity
-                            style={styles.avatarEdit}
-                            onPress={() => Alert.alert('Coming Soon', 'Photo upload requires expo-image-picker')}
-                        >
-                            <Ionicons name="camera-outline" size={16} color={colors.onPrimary} />
-                        </TouchableOpacity>
+                        {groupPhoto ? (
+                            <Image source={{ uri: groupPhoto }} style={styles.avatarPhoto} />
+                        ) : (
+                            <View style={styles.avatar}>
+                                <Text style={styles.avatarText}>
+                                    {groupName.charAt(0).toUpperCase() || 'G'}
+                                </Text>
+                            </View>
+                        )}
+                        {isUploadingPhoto && (
+                            <View style={styles.avatarOverlay}>
+                                <ActivityIndicator size="small" color={colors.onPrimary} />
+                            </View>
+                        )}
+                        {isAdmin && (
+                            <TouchableOpacity
+                                style={styles.avatarEdit}
+                                onPress={handlePhotoPress}
+                                disabled={isUploadingPhoto}
+                            >
+                                <Ionicons name="camera-outline" size={16} color={colors.onPrimary} />
+                            </TouchableOpacity>
+                        )}
                     </View>
                     <Text style={[typographyStyles.bodySmall, styles.avatarHint]}>
-                        Tap to change group photo
+                        {isAdmin ? 'Tap to change group photo' : 'Only the admin can change the photo'}
                     </Text>
                 </View>
 
@@ -256,11 +305,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: spacing.gutter,
-        paddingTop: spacing.md,
+        paddingTop: spacing.xxl,
         paddingBottom: spacing.sm,
         backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.outlineVariant,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.outlineVariant + '50',
     },
     backButton: {
         padding: spacing.sm,
@@ -305,6 +354,22 @@ const styles = StyleSheet.create({
         height: 88,
         borderRadius: 44,
         backgroundColor: colors.primaryContainer,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    avatarPhoto: {
+        width: 88,
+        height: 88,
+        borderRadius: 44,
+    },
+    avatarOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: 88,
+        height: 88,
+        borderRadius: 44,
+        backgroundColor: 'rgba(0,0,0,0.45)',
         alignItems: 'center',
         justifyContent: 'center',
     },

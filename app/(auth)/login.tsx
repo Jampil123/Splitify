@@ -261,7 +261,7 @@ export default function LoginScreen() {
                                 style={styles.googleIconImage}
                             />
                         </View>
-                        <Text style={[typographyStyles.bodySmall, styles.googleText]}>
+                        <Text style={[typographyStyles.bodyMedium, styles.googleText]}>
                             Sign in with Google
                         </Text>
                     </TouchableOpacity>
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
         color: colors.onSurfaceVariant,
     },
     signUpText: {
-        color: colors.primary,
+        color: colors.primaryContainer,
         fontWeight: '600',
     },
 });

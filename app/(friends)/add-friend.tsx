@@ -24,16 +24,21 @@ interface SearchResult {
     photoURL: string | null;
     isFriend: boolean;
     hasPendingRequest: boolean;
+    pendingRequestId?: string;
 }
 
 function SearchResultItem({
     item,
     onAddFriend,
+    onCancelRequest,
     isLoading,
+    isCanceling,
 }: {
     item: SearchResult;
     onAddFriend: (userId: string) => void;
+    onCancelRequest: (requestId: string) => void;
     isLoading: boolean;
+    isCanceling: boolean;
 }) {
     return (
         <View style={styles.resultCard}>
@@ -59,17 +64,34 @@ function SearchResultItem({
                     <Text style={styles.friendBadgeText}>Friends</Text>
                 </View>
             ) : item.hasPendingRequest ? (
-                <View style={styles.pendingBadge}>
-                    <Text style={styles.pendingBadgeText}>Pending</Text>
-                </View>
+                <TouchableOpacity
+                    style={styles.cancelRequestButton}
+                    onPress={() => item.pendingRequestId && onCancelRequest(item.pendingRequestId)}
+                    disabled={isCanceling}
+                >
+                    {isCanceling ? (
+                        <ActivityIndicator size="small" color={colors.error} />
+                    ) : (
+                        <>
+                            <Ionicons name="close-circle-outline" size={16} color={colors.error} />
+                            <Text style={styles.cancelRequestText}>Cancel</Text>
+                        </>
+                    )}
+                </TouchableOpacity>
             ) : (
                 <TouchableOpacity
                     style={styles.addFriendButton}
                     onPress={() => onAddFriend(item.id)}
                     disabled={isLoading}
                 >
-                    <Ionicons name="person-add-outline" size={20} color={colors.onPrimary} />
-                    <Text style={styles.addFriendText}>Add</Text>
+                    {isLoading ? (
+                        <ActivityIndicator size="small" color={colors.onPrimary} />
+                    ) : (
+                        <>
+                            <Ionicons name="person-add-outline" size={20} color={colors.onPrimary} />
+                            <Text style={styles.addFriendText}>Add</Text>
+                        </>
+                    )}
                 </TouchableOpacity>
             )}
         </View>
@@ -79,12 +101,13 @@ function SearchResultItem({
 export default function AddFriendScreen() {
     const router = useRouter();
     const { user } = useAuthStore();
-    const { searchForUsers, sendRequest } = useFriends(user?.id);
-    
+    const { searchForUsers, sendRequest, cancelRequest } = useFriends(user?.id);
+
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [sendingRequest, setSendingRequest] = useState<string | null>(null);
+    const [cancelingRequest, setCancelingRequest] = useState<string | null>(null);
 
     const handleSearch = async () => {
         if (searchQuery.length < 2) {
@@ -100,6 +123,16 @@ export default function AddFriendScreen() {
             Alert.alert('Error', 'Failed to search users');
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleCancelRequest = async (requestId: string) => {
+        setCancelingRequest(requestId);
+        try {
+            await cancelRequest(requestId);
+            handleSearch();
+        } finally {
+            setCancelingRequest(null);
         }
     };
 
@@ -156,7 +189,9 @@ export default function AddFriendScreen() {
                         <SearchResultItem
                             item={item}
                             onAddFriend={handleAddFriend}
+                            onCancelRequest={handleCancelRequest}
                             isLoading={sendingRequest === item.id}
+                            isCanceling={cancelingRequest === item.pendingRequestId}
                         />
                     )}
                     contentContainerStyle={styles.resultsList}
@@ -317,6 +352,23 @@ const styles = StyleSheet.create({
     addFriendText: {
         fontSize: 12,
         color: colors.onPrimary,
+        fontWeight: '600',
+    },
+    cancelRequestButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: colors.error,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderRadius: spacing.borderRadiusFull,
+        gap: 4,
+        minWidth: 72,
+        justifyContent: 'center',
+    },
+    cancelRequestText: {
+        fontSize: 12,
+        color: colors.error,
         fontWeight: '600',
     },
     loadingContainer: {

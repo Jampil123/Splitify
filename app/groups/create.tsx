@@ -1,8 +1,10 @@
 ﻿import { db } from '@/services/firebase/config';
+import { uploadGroupPhoto } from '@/services/supabase';
 import { useFriends } from '@/services/hooks/useFriends';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { addDoc, arrayUnion, collection, doc, serverTimestamp, Timestamp, updateDoc } from 'firebase/firestore';
@@ -36,6 +38,7 @@ export default function CreateGroupScreen() {
     
     const [groupName, setGroupName] = useState('');
     const [description, setDescription] = useState('');
+    const [groupPhotoUri, setGroupPhotoUri] = useState<string | null>(null);
     const [selectedMembers, setSelectedMembers] = useState<SelectedMember[]>([]);
     const [splitType, setSplitType] = useState<'equal' | 'custom'>('equal');
     const [isLoading, setIsLoading] = useState(false);
@@ -53,6 +56,23 @@ export default function CreateGroupScreen() {
             }]);
         }
     }, [user]);
+
+    const handlePhotoPress = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission needed', 'Please allow access to your photo library.');
+            return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: 'images' as any,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+        });
+        if (!result.canceled && result.assets[0]) {
+            setGroupPhotoUri(result.assets[0].uri);
+        }
+    };
 
     const handleAddMember = (member: any) => {
         if (!selectedMembers.some(m => m.userId === member.id)) {
@@ -117,7 +137,15 @@ export default function CreateGroupScreen() {
             };
 
             const docRef = await addDoc(groupsRef, newGroup);
-            
+
+            // Upload group photo if selected
+            if (groupPhotoUri) {
+                const photoURL = await uploadGroupPhoto(docRef.id, groupPhotoUri);
+                if (photoURL) {
+                    await updateDoc(doc(db, 'groups', docRef.id), { groupPhoto: photoURL });
+                }
+            }
+
             // Add group ID to each member's groups array
             for (const member of selectedMembers) {
                 const userRef = doc(db, 'users', member.userId);
@@ -172,14 +200,18 @@ export default function CreateGroupScreen() {
             >
                 {/* Group Photo Section */}
                 <View style={styles.photoSection}>
-                    <View style={styles.photoContainer}>
-                        <Ionicons name="camera-outline" size={32} color={colors.primary} />
+                    <TouchableOpacity style={styles.photoContainer} onPress={handlePhotoPress}>
+                        {groupPhotoUri ? (
+                            <Image source={{ uri: groupPhotoUri }} style={styles.photoImage} />
+                        ) : (
+                            <Ionicons name="camera-outline" size={32} color={colors.primary} />
+                        )}
                         <View style={styles.photoAddBadge}>
-                            <Ionicons name="add" size={14} color={colors.onPrimary} />
+                            <Ionicons name={groupPhotoUri ? 'pencil' : 'add'} size={14} color={colors.onPrimary} />
                         </View>
-                    </View>
+                    </TouchableOpacity>
                     <Text style={[typographyStyles.labelMedium, styles.photoLabel]}>
-                        Add Group Photo
+                        {groupPhotoUri ? 'Change Photo' : 'Add Group Photo'}
                     </Text>
                 </View>
 
@@ -465,11 +497,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: spacing.gutter,
-        paddingTop: spacing.md,
+        paddingTop: spacing.xxl,
         paddingBottom: spacing.sm,
-        backgroundColor: colors.background,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.outlineVariant,
+        backgroundColor: colors.surface,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.outlineVariant + '50',
     },
     backButton: {
         padding: spacing.sm,
@@ -501,6 +533,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         position: 'relative',
+    },
+    photoImage: {
+        position: 'absolute',
+        width: 80,
+        height: 80,
+        borderRadius: 40,
     },
     photoAddBadge: {
         position: 'absolute',

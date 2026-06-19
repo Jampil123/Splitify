@@ -1,6 +1,7 @@
 import { FriendRequest, UserSearchResult } from '@/types';
 import { useCallback, useEffect, useState } from 'react';
 import {
+    cancelFriendRequest,
     getPendingFriendRequests,
     getSentFriendRequests,
     getUserFriends,
@@ -108,6 +109,18 @@ export function useFriends(currentUserId: string | undefined, options: UseFriend
     }
   }, [currentUserId, fetchAllFriendData]);
 
+  const cancelRequest = useCallback(async (requestId: string): Promise<boolean> => {
+    if (!currentUserId) return false;
+    try {
+      const success = await cancelFriendRequest(requestId);
+      if (success) await fetchAllFriendData();
+      return success;
+    } catch (err: any) {
+      setError(err.message);
+      return false;
+    }
+  }, [currentUserId, fetchAllFriendData]);
+
   const searchForUsers = useCallback(async (searchTerm: string): Promise<UserSearchResult[]> => {
     if (!currentUserId) return [];
 
@@ -135,6 +148,7 @@ export function useFriends(currentUserId: string | undefined, options: UseFriend
     sendRequest,
     acceptRequest,
     rejectRequest,
+    cancelRequest,
     unfriend,
     searchForUsers,
   };

@@ -4,6 +4,7 @@ import {
     arrayUnion,
     collection,
     db,
+    deleteDoc,
     doc,
     getDoc,
     getDocs,
@@ -163,6 +164,20 @@ export async function respondToFriendRequest(
 }
 
 /**
+ * Cancel a sent friend request (deletes the document)
+ */
+export async function cancelFriendRequest(requestId: string): Promise<boolean> {
+  try {
+    const requestRef = doc(db, 'friendRequests', requestId);
+    await deleteDoc(requestRef);
+    return true;
+  } catch (error) {
+    console.error('Error canceling friend request:', error);
+    return false;
+  }
+}
+
+/**
  * Remove a friend
  */
 export async function removeFriend(userId: string, friendId: string): Promise<boolean> {
@@ -282,6 +297,9 @@ export async function searchUsers(
       );
       const pendingSnapshot = await getDocs(pendingQuery);
       result.hasPendingRequest = !pendingSnapshot.empty;
+      if (!pendingSnapshot.empty) {
+        result.pendingRequestId = pendingSnapshot.docs[0].id;
+      }
     }
     
     return results;

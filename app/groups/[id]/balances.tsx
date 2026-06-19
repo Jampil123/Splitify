@@ -9,6 +9,7 @@ import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firesto
 import { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
+    Image,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -17,7 +18,9 @@ import {
     View,
 } from 'react-native';
 
-function MemberRow({ member, isCurrentUser }: { member: UserBalance; isCurrentUser: boolean }) {
+type MemberBalance = UserBalance & { photoURL?: string | null };
+
+function MemberRow({ member, isCurrentUser }: { member: MemberBalance; isCurrentUser: boolean }) {
     const isPositive = member.balance > 0;
     const isNegative = member.balance < 0;
     const sign = isPositive ? '+' : isNegative ? '−' : '';
@@ -26,8 +29,12 @@ function MemberRow({ member, isCurrentUser }: { member: UserBalance; isCurrentUs
 
     return (
         <View style={s.memberRow}>
-            <View style={[s.avatar, isCurrentUser && s.avatarYou]}>
-                <Text style={s.avatarText}>{member.userName.charAt(0).toUpperCase()}</Text>
+            <View style={[s.avatar, isCurrentUser && s.avatarYou, { overflow: 'hidden' }]}>
+                {member.photoURL ? (
+                    <Image source={{ uri: member.photoURL }} style={s.avatarImg} />
+                ) : (
+                    <Text style={s.avatarText}>{member.userName.charAt(0).toUpperCase()}</Text>
+                )}
             </View>
             <View style={s.memberInfo}>
                 <Text style={s.memberName} numberOfLines={1}>
@@ -44,11 +51,13 @@ function MemberRow({ member, isCurrentUser }: { member: UserBalance; isCurrentUs
 
 function PaymentRow({
     name,
+    photoURL,
     amount,
     type,
     onPress,
 }: {
     name: string;
+    photoURL?: string | null;
     amount: number;
     type: 'owe' | 'receive';
     onPress: () => void;
@@ -59,11 +68,15 @@ function PaymentRow({
 
     return (
         <View style={[s.payRow, { backgroundColor: rowBg }]}>
-            <View style={[s.avatar, { backgroundColor: isOwe ? colors.errorContainer : colors.primaryContainer }]}>
-                <Text style={s.avatarText}>{name.charAt(0).toUpperCase()}</Text>
+            <View style={[s.avatar, { backgroundColor: isOwe ? colors.errorContainer : colors.primaryContainer, overflow: 'hidden' }]}>
+                {photoURL ? (
+                    <Image source={{ uri: photoURL }} style={s.avatarImg} />
+                ) : (
+                    <Text style={s.avatarText}>{name.charAt(0).toUpperCase()}</Text>
+                )}
             </View>
             <View style={s.payInfo}>
-                <Text style={s.payLabel}>{isOwe ? 'You owe' : 'Owes you'}</Text>
+                <Text style={s.payLabel}>{isOwe ? 'You pay' : 'Will pay you'}</Text>
                 <Text style={s.payName} numberOfLines={1}>{name}</Text>
             </View>
             <View style={s.payRight}>
@@ -89,7 +102,8 @@ export default function BalancesScreen() {
     const { user } = useAuthStore();
 
     const [settlements, setSettlements] = useState<Settlement[]>([]);
-    const [balances, setBalances] = useState<UserBalance[]>([]);
+    const [balances, setBalances] = useState<MemberBalance[]>([]);
+    const [memberPhotoMap, setMemberPhotoMap] = useState<Record<string, string | null>>({});
     const [userBalance, setUserBalance] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -110,9 +124,14 @@ export default function BalancesScreen() {
             const share = memberCount > 0 ? (groupData.totalExpenses || 0) / memberCount : 0;
             setIndividualShare(share);
 
-            const userBalances: UserBalance[] = groupData.members.map(m => ({
+            const photoMap: Record<string, string | null> = {};
+            groupData.members.forEach(m => { photoMap[m.userId] = m.photoURL || null; });
+            setMemberPhotoMap(photoMap);
+
+            const userBalances: MemberBalance[] = groupData.members.map(m => ({
                 userId: m.userId,
                 userName: m.fullName,
+                photoURL: m.photoURL || null,
                 totalPaid: m.totalPaid || 0,
                 totalShare: share,
                 balance: (m.totalPaid || 0) - share,
@@ -179,7 +198,7 @@ export default function BalancesScreen() {
                         {sign}₱{Math.abs(userBalance).toFixed(2)}
                     </Text>
                     <Text style={[s.heroStatus, { color: balanceColor }]}>
-                        {isSettled ? 'All settled up' : isOwed ? 'You are owed' : 'You owe'}
+                        {isSettled ? 'All settled up' : isOwed ? 'You will receive' : 'You will pay'}
                     </Text>
                     <View style={s.heroStats}>
                         <View style={s.heroStat}>
@@ -235,6 +254,7 @@ export default function BalancesScreen() {
                                     <PaymentRow
                                         key={settlement.id || i}
                                         name={settlement.toUserName}
+                                        photoURL={memberPhotoMap[settlement.toUserId]}
                                         amount={settlement.amount}
                                         type="owe"
                                         onPress={goToSettlements}
@@ -249,6 +269,7 @@ export default function BalancesScreen() {
                                     <PaymentRow
                                         key={settlement.id || i}
                                         name={settlement.fromUserName}
+                                        photoURL={memberPhotoMap[settlement.fromUserId]}
                                         amount={settlement.amount}
                                         type="receive"
                                         onPress={goToSettlements}
@@ -285,9 +306,15 @@ const s = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
     header: {
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: spacing.gutter, paddingTop: spacing.md, paddingBottom: spacing.sm,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: spacing.gutter,
+        paddingTop: spacing.xxl,
+        paddingBottom: spacing.sm,
         backgroundColor: colors.surface,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.outlineVariant + '50',
     },
     backBtn: { padding: spacing.sm, width: 40 },
     headerTitle: { color: colors.primary, fontSize: 18 },
@@ -345,6 +372,7 @@ const s = StyleSheet.create({
         width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryContainer,
         alignItems: 'center', justifyContent: 'center', flexShrink: 0,
     },
+    avatarImg: { width: 40, height: 40 },
     avatarYou: { borderWidth: 2, borderColor: colors.primary },
     avatarText: { fontSize: 16, fontWeight: '700', color: colors.onPrimary, fontFamily: 'Poppins_700Bold' },
     memberInfo: { flex: 1 },

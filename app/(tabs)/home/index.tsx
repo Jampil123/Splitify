@@ -34,7 +34,7 @@ function GroupCard({ id, name, memberCount, balance, imageUrl, icon, onPress }: 
     const isOwes = balance < 0;
     const isSettled = balance === 0;
     
-    const balanceText = isSettled ? 'Settled' : (isOwed ? 'You get' : 'You owe');
+    const balanceText = isSettled ? 'Settled' : (isOwed ? 'You receive' : 'You pay');
     const balanceAmount = Math.abs(balance).toFixed(2);
     const balanceColor = isSettled ? colors.onSurfaceVariant : (isOwed ? '#4CAF50' : colors.error);
 
@@ -150,15 +150,17 @@ export default function HomeScreen() {
             
             {/* Header */}
             <View style={styles.header}>
-                <Text style={[typographyStyles.headlineMedium, styles.headerTitle]}>
-                    My Groups
-                </Text>
+                <View>
+                    <Text style={styles.headerGreeting}>
+                        Hello, {user?.fullName?.split(' ')[0] || 'there'} 👋
+                    </Text>
+                    <Text style={[typographyStyles.headlineMedium, styles.headerTitle]}>
+                        My Groups
+                    </Text>
+                </View>
                 <View style={styles.headerActions}>
                     <TouchableOpacity style={styles.headerButton} onPress={handleSearch}>
                         <Ionicons name="search" size={24} color={colors.onSurface} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.headerButton} onPress={handleCreateGroup}>
-                        <Ionicons name="add" size={28} color={colors.onSurface} />
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.avatarButton} onPress={handleProfilePress}>
                         {user?.photoURL ? (
@@ -203,12 +205,12 @@ export default function HomeScreen() {
                                     <Text style={[typographyStyles.labelMedium, styles.summaryLabel]}>
                                         Summary
                                     </Text>
-                                    <Text style={styles.summaryIcon}>📊</Text>
+                                    <Ionicons name="bar-chart" style={styles.summaryIcon} />
                                 </View>
                                 <View style={styles.summaryRow}>
                                     <View style={styles.summaryItem}>
                                         <Text style={[typographyStyles.bodySmall, styles.summaryItemLabel]}>
-                                            You owe overall
+                                            You pay
                                         </Text>
                                         <Text style={[typographyStyles.headlineMedium, styles.summaryOwedAmount]}>
                                             ₱{totalOwed.toFixed(2)}
@@ -217,7 +219,7 @@ export default function HomeScreen() {
                                     <View style={styles.summaryDivider} />
                                     <View style={styles.summaryItem}>
                                         <Text style={[typographyStyles.bodySmall, styles.summaryItemLabel]}>
-                                            You are owed
+                                            You receive
                                         </Text>
                                         <Text style={[typographyStyles.headlineMedium, styles.summaryOwedToMeAmount]}>
                                             ₱{totalOwedToMe.toFixed(2)}
@@ -253,9 +255,17 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: spacing.gutter,
-        paddingTop: spacing.md,
-        paddingBottom: spacing.sm,
-        backgroundColor: colors.background,
+        paddingTop: spacing.xxl,
+        paddingBottom: spacing.md,
+        backgroundColor: colors.surface,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.outlineVariant + '50',
+    },
+    headerGreeting: {
+        fontSize: 13,
+        fontFamily: 'Poppins_400Regular',
+        color: colors.onSurfaceVariant,
+        marginBottom: 2,
     },
     headerTitle: {
         color: colors.primary,
@@ -395,7 +405,7 @@ const styles = StyleSheet.create({
     },
     groupName: {
         color: colors.onSurface,
-        fontSize: 18,
+        fontSize: 16,
         marginBottom: 2,
     },
     groupMembers: {

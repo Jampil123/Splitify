@@ -161,24 +161,26 @@ export default function NotificationsScreen() {
             </View>
 
             {/* Filter chips */}
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={s.filters}
-            >
-                {FILTERS.map(f => (
-                    <TouchableOpacity
-                        key={f.id}
-                        style={[s.chip, filter === f.id && s.chipActive]}
-                        onPress={() => setFilter(f.id)}
-                        activeOpacity={0.7}
-                    >
-                        <Text style={[s.chipText, filter === f.id && s.chipTextActive]}>
-                            {f.label}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </ScrollView>
+            <View style={s.filtersRow}>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={s.filters}
+                >
+                    {FILTERS.map(f => (
+                        <TouchableOpacity
+                            key={f.id}
+                            style={[s.chip, filter === f.id && s.chipActive]}
+                            onPress={() => setFilter(f.id)}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={[s.chipText, filter === f.id && s.chipTextActive]}>
+                                {f.label}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            </View>
 
             {/* List */}
             <FlatList
@@ -227,14 +229,14 @@ const s = StyleSheet.create({
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: spacing.gutter,
-        paddingTop: spacing.lg, paddingBottom: spacing.md,
+        paddingTop: spacing.xxl, paddingBottom: spacing.md,
         backgroundColor: colors.surface,
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: colors.outlineVariant + '50',
     },
     headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     headerTitle: {
-        fontSize: 20, fontWeight: '700', color: colors.primary, fontFamily: 'Poppins_700Bold',
+        fontSize: 24, fontWeight: '600', color: colors.primary, fontFamily: 'Poppins_600SemiBold',
     },
     badge: {
         backgroundColor: colors.error, borderRadius: 10,
@@ -246,10 +248,17 @@ const s = StyleSheet.create({
         fontSize: 13, color: colors.primary, fontFamily: 'Poppins_500Medium',
     },
     // Filters
+    filtersRow: {
+        height: 48,
+        justifyContent: 'center',
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.outlineVariant + '30',
+    },
     filters: {
         paddingHorizontal: spacing.gutter,
-        paddingTop: spacing.sm, paddingBottom: spacing.sm,
+        alignItems: 'center',
         gap: spacing.sm,
+        flexDirection: 'row',
     },
     chip: {
         height: 32, paddingHorizontal: 14, borderRadius: 16,
@@ -262,7 +271,7 @@ const s = StyleSheet.create({
     // Sections
     sectionTitle: {
         fontSize: 11, fontWeight: '600', color: colors.onSurfaceVariant,
-        paddingHorizontal: spacing.gutter, paddingTop: spacing.md, paddingBottom: spacing.sm,
+        paddingHorizontal: spacing.gutter, paddingTop: spacing.xs, paddingBottom: spacing.xs,
         fontFamily: 'Poppins_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.8,
     },
     // Items

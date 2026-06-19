@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Image,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -23,11 +24,15 @@ import {
 function SettlementCard({
     settlement,
     currentUserId,
+    fromPhotoURL,
+    toPhotoURL,
     onMarkPaid,
     onRemind,
 }: {
     settlement: Settlement;
     currentUserId: string;
+    fromPhotoURL?: string | null;
+    toPhotoURL?: string | null;
     onMarkPaid: (id: string) => void;
     onRemind: (id: string) => void;
 }) {
@@ -39,12 +44,20 @@ function SettlementCard({
             <View style={styles.cardHeader}>
                 <View style={styles.cardLeft}>
                     <View style={styles.avatarRow}>
-                        <View style={styles.avatar}>
-                            <Text style={styles.avatarText}>{getInitials(settlement.fromUserName)}</Text>
+                        <View style={[styles.avatar, { overflow: 'hidden' }]}>
+                            {fromPhotoURL ? (
+                                <Image source={{ uri: fromPhotoURL }} style={styles.avatarImg} />
+                            ) : (
+                                <Text style={styles.avatarText}>{getInitials(settlement.fromUserName)}</Text>
+                            )}
                         </View>
                         <Ionicons name="arrow-forward" size={20} color={colors.primary} style={styles.arrowIcon} />
-                        <View style={[styles.avatar, styles.avatarTo]}>
-                            <Text style={styles.avatarText}>{getInitials(settlement.toUserName)}</Text>
+                        <View style={[styles.avatar, styles.avatarTo, { overflow: 'hidden' }]}>
+                            {toPhotoURL ? (
+                                <Image source={{ uri: toPhotoURL }} style={styles.avatarImg} />
+                            ) : (
+                                <Text style={styles.avatarText}>{getInitials(settlement.toUserName)}</Text>
+                            )}
                         </View>
                     </View>
                     <View style={{ flex: 1 }}>
@@ -95,6 +108,7 @@ export default function SettlementsScreen() {
     
     const [group, setGroup] = useState<Group | null>(null);
     const [settlements, setSettlements] = useState<Settlement[]>([]);
+    const [memberPhotoMap, setMemberPhotoMap] = useState<Record<string, string | null>>({});
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [totalAmount, setTotalAmount] = useState(0);
@@ -111,6 +125,9 @@ export default function SettlementsScreen() {
             if (groupSnap.exists()) {
                 const groupData = { id: groupSnap.id, ...groupSnap.data() } as Group;
                 setGroup(groupData);
+                const photoMap: Record<string, string | null> = {};
+                (groupData.members || []).forEach(m => { photoMap[m.userId] = m.photoURL || null; });
+                setMemberPhotoMap(photoMap);
             } else {
                 Alert.alert('Error', 'Group not found');
                 router.back();
@@ -199,7 +216,7 @@ export default function SettlementsScreen() {
             await createNotification({
                 userId: (settlement as any).fromUserId,
                 title: 'Payment Reminder',
-                body: `You owe ${settlement.toUserName} ₱${settlement.amount.toFixed(2)}. Please settle up!`,
+                body: `You need to pay ${settlement.toUserName} ₱${settlement.amount.toFixed(2)}. Please settle up!`,
                 type: 'settlement_reminder',
                 groupId,
                 relatedUserId: user?.id,
@@ -269,6 +286,8 @@ export default function SettlementsScreen() {
                                 key={settlement.id}
                                 settlement={settlement}
                                 currentUserId={user?.id || ''}
+                                fromPhotoURL={memberPhotoMap[settlement.fromUserId]}
+                                toPhotoURL={memberPhotoMap[settlement.toUserId]}
                                 onMarkPaid={handleMarkPaid}
                                 onRemind={handleRemind}
                             />
@@ -319,11 +338,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: spacing.gutter,
-        paddingTop: spacing.md,
+        paddingTop: spacing.xxl,
         paddingBottom: spacing.sm,
         backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.outlineVariant,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.outlineVariant + '50',
     },
     backButton: {
         padding: spacing.sm,
@@ -418,6 +437,10 @@ const styles = StyleSheet.create({
     },
     avatarTo: {
         backgroundColor: colors.tertiary,
+    },
+    avatarImg: {
+        width: 40,
+        height: 40,
     },
     avatarText: {
         fontSize: 14,

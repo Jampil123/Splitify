@@ -1,5 +1,6 @@
 import { getCurrentUserData } from '@/services/firebase/auth';
 import { auth, onAuthStateChanged } from '@/services/firebase/config';
+import { initPresence } from '@/services/firebase/presence';
 import { useAuthStore } from '@/stores/authStore';
 import { colors } from '@/styles';
 import { Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold, Poppins_800ExtraBold, useFonts } from '@expo-google-fonts/poppins';
@@ -8,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 export default function RootLayout() {
-    const { setUser, setLoading, isAuthenticated, isLoading: authIsLoading } = useAuthStore();
+    const { setUser, setLoading, user, isLoading: authIsLoading } = useAuthStore();
     const [isAuthChecked, setIsAuthChecked] = useState(false);
 
     const [fontsLoaded] = useFonts({
@@ -20,7 +21,13 @@ export default function RootLayout() {
     });
 
     useEffect(() => {
-        
+        if (!user?.id) return;
+        const cleanup = initPresence(user.id);
+        return cleanup;
+    }, [user?.id]);
+
+    useEffect(() => {
+
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             
             if (firebaseUser) {

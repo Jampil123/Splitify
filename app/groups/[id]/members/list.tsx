@@ -1,5 +1,6 @@
 import { removeMemberFromGroup } from '@/services/api/groups';
 import { db } from '@/services/firebase/config';
+import { usePresence } from '@/services/hooks/usePresence';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
 import { Group, GroupMember } from '@/types';
@@ -26,6 +27,7 @@ function MemberCard({
     isCurrentUser,
     isAdmin,
     showRemove,
+    isOnline,
     onPress,
     onRemove,
 }: {
@@ -33,6 +35,7 @@ function MemberCard({
     isCurrentUser: boolean;
     isAdmin: boolean;
     showRemove?: boolean;
+    isOnline?: boolean;
     onPress: () => void;
     onRemove?: () => void;
 }) {
@@ -40,19 +43,22 @@ function MemberCard({
     const isOwed = member.balance > 0;
     const isSettled = member.balance === 0;
     
-    const statusText = isSettled ? 'Settled' : (isOwed ? 'Is owed' : 'Owes');
+    const statusText = isSettled ? 'Settled' : (isOwed ? 'To receive' : 'To pay');
     const statusColor = isSettled ? colors.outline : (isOwed ? '#4CAF50' : colors.error);
     const amountColor = isSettled ? colors.outline : (isOwed ? '#4CAF50' : colors.error);
 
     return (
         <TouchableOpacity style={styles.memberCard} onPress={onPress} activeOpacity={0.7}>
             <View style={styles.memberLeft}>
-                <View style={[styles.memberAvatar, isCurrentUser && styles.currentUserAvatar]}>
-                    {member.photoURL ? (
-                        <Image source={{ uri: member.photoURL }} style={styles.memberAvatarImage} />
-                    ) : (
-                        <Text style={styles.memberAvatarText}>{getInitials(member.fullName)}</Text>
-                    )}
+                <View style={styles.memberAvatarWrapper}>
+                    <View style={[styles.memberAvatar, isCurrentUser && styles.currentUserAvatar]}>
+                        {member.photoURL ? (
+                            <Image source={{ uri: member.photoURL }} style={styles.memberAvatarImage} />
+                        ) : (
+                            <Text style={styles.memberAvatarText}>{getInitials(member.fullName)}</Text>
+                        )}
+                    </View>
+                    {isOnline && <View style={styles.onlineDot} />}
                 </View>
                 <View>
                     <View style={styles.memberNameRow}>
@@ -101,6 +107,9 @@ export default function AllMembersScreen() {
     const [members, setMembers] = useState<GroupMember[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+
+    const memberIds = members.map((m) => m.userId);
+    const onlineMap = usePresence(memberIds);
 
     const fetchMembers = useCallback(async () => {
         if (!groupId) return;
@@ -239,6 +248,7 @@ export default function AllMembersScreen() {
                         isCurrentUser={item.userId === user?.id}
                         isAdmin={item.userId === group?.createdBy}
                         showRemove={user?.id === group?.createdBy && item.userId !== user?.id}
+                        isOnline={onlineMap[item.userId] === true}
                         onPress={() => handleMemberPress(item)}
                         onRemove={() => handleRemoveMember(item)}
                     />
@@ -285,11 +295,11 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: spacing.gutter,
-        paddingTop: spacing.md,
+        paddingTop: spacing.xxl,
         paddingBottom: spacing.sm,
         backgroundColor: colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.outlineVariant,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.outlineVariant + '50',
     },
     headerLeft: {
         flexDirection: 'row',
@@ -358,6 +368,9 @@ const styles = StyleSheet.create({
         gap: spacing.sm,
         flex: 1,
     },
+    memberAvatarWrapper: {
+        position: 'relative',
+    },
     memberAvatar: {
         width: 48,
         height: 48,
@@ -365,6 +378,17 @@ const styles = StyleSheet.create({
         backgroundColor: colors.primaryContainer,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    onlineDot: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: '#22C55E',
+        borderWidth: 2,
+        borderColor: colors.background,
     },
     currentUserAvatar: {
         borderWidth: 2,

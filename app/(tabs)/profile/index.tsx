@@ -1,7 +1,9 @@
 ﻿import { updateUserProfile } from '@/services/firebase/auth';
+import { uploadUserAvatar } from '@/services/supabase';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
@@ -143,6 +145,7 @@ export default function ProfileScreen() {
     const [emailNotifications, setEmailNotifications] = useState(true);
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
     const handleLogout = () => {
         Alert.alert(
@@ -164,6 +167,40 @@ export default function ProfileScreen() {
 
     const handleEditProfile = () => {
         router.push('/profile/edit');
+    };
+
+    const handleAvatarPress = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission needed', 'Please allow access to your photo library to change your profile picture.');
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: 'images' as any,
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+        });
+
+        if (result.canceled || !result.assets[0]) return;
+        if (!user?.id) return;
+
+        setIsUploadingPhoto(true);
+        try {
+            const uri = result.assets[0].uri;
+            const photoURL = await uploadUserAvatar(user.id, uri);
+            if (!photoURL) {
+                Alert.alert('Upload failed', 'Could not upload photo. Please try again.');
+                return;
+            }
+            await updateUserProfile(user.id, { photoURL });
+            await refreshUserData(user.id);
+        } catch (err) {
+            Alert.alert('Error', 'Something went wrong while uploading your photo.');
+        } finally {
+            setIsUploadingPhoto(false);
+        }
     };
 
     const handleUpdateProfile = async (data: { fullName: string }) => {
@@ -217,7 +254,16 @@ export default function ProfileScreen() {
                                 </Text>
                             </View>
                         )}
-                        <TouchableOpacity style={styles.editAvatarButton} onPress={handleEditProfile}>
+                        {isUploadingPhoto && (
+                            <View style={styles.avatarUploadingOverlay}>
+                                <ActivityIndicator size="small" color={colors.onPrimary} />
+                            </View>
+                        )}
+                        <TouchableOpacity
+                            style={styles.editAvatarButton}
+                            onPress={handleAvatarPress}
+                            disabled={isUploadingPhoto}
+                        >
                             <Ionicons name="camera-outline" size={16} color={colors.onPrimary} />
                         </TouchableOpacity>
                     </View>
@@ -252,7 +298,7 @@ export default function ProfileScreen() {
                         <Text style={[typographyStyles.headlineMedium, styles.statValue]}>
                             ₱{user?.totalOwed?.toFixed(2) || '0.00'}
                         </Text>
-                        <Text style={[typographyStyles.bodySmall, styles.statLabel]}>Total Owed</Text>
+                        <Text style={[typographyStyles.bodySmall, styles.statLabel]}>To Receive</Text>
                     </View>
                 </View>
 
@@ -274,7 +320,7 @@ export default function ProfileScreen() {
                             <View style={styles.menuIconContainer}>
                                 <Ionicons name="notifications" size={22} color={colors.primary} />
                             </View>
-                            <View>
+                            <View style={styles.switchItemText}>
                                 <Text style={[typographyStyles.bodyMedium, styles.menuTitle]}>
                                     Push Notifications
                                 </Text>
@@ -296,7 +342,7 @@ export default function ProfileScreen() {
                             <View style={styles.menuIconContainer}>
                                 <Ionicons name="mail-outline" size={22} color={colors.primary} />
                             </View>
-                            <View>
+                            <View style={styles.switchItemText}>
                                 <Text style={[typographyStyles.bodyMedium, styles.menuTitle]}>
                                     Email Notifications
                                 </Text>
@@ -377,7 +423,7 @@ const styles = StyleSheet.create({
     // Header
     header: {
         alignItems: 'center',
-        paddingTop: spacing.xl,
+        paddingTop: spacing.xxl,
         paddingBottom: spacing.lg,
         backgroundColor: colors.surface,
         borderBottomLeftRadius: spacing.borderRadiusLg,
@@ -417,6 +463,17 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         borderWidth: 2,
         borderColor: colors.surface,
+    },
+    avatarUploadingOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     userName: {
         color: colors.onSurface,
@@ -541,10 +598,15 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.md,
         borderBottomWidth: 1,
         borderBottomColor: colors.outlineVariant,
+        gap: spacing.sm,
     },
     switchItemLeft: {
         flexDirection: 'row',
         alignItems: 'center',
+        flex: 1,
+        gap: spacing.sm,
+    },
+    switchItemText: {
         flex: 1,
     },
     // Footer

@@ -75,7 +75,7 @@ function ExpenseItem({ expense, onPress }: { expense: Expense; onPress: () => vo
                     styles.expenseStatus,
                     isPaidByUser ? styles.statusPaid : styles.statusOwed,
                 ]}>
-                    {isPaidByUser ? 'You paid' : `You owe ₱${expense.individualShare?.toFixed(2) || '0.00'}`}
+                    {isPaidByUser ? 'You paid' : `You pay ₱${expense.individualShare?.toFixed(2) || '0.00'}`}
                 </Text>
             </View>
         </TouchableOpacity>
@@ -405,9 +405,11 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: spacing.gutter,
-        paddingTop: spacing.md,
+        paddingTop: spacing.xxl,
         paddingBottom: spacing.sm,
         backgroundColor: colors.surface,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.outlineVariant + '50',
     },
     headerLeft: {
         flexDirection: 'row',

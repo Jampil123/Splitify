@@ -1,4 +1,5 @@
 ﻿import { useFriends } from '@/services/hooks/useFriends';
+import { usePresence } from '@/services/hooks/usePresence';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,20 +24,24 @@ interface FriendCardProps {
     name: string;
     mutualGroups: number;
     avatar?: string | null;
+    isOnline?: boolean;
     onChat?: () => void;
 }
 
-function FriendCard({ id, name, mutualGroups, avatar, onChat }: FriendCardProps) {
+function FriendCard({ id, name, mutualGroups, avatar, isOnline, onChat }: FriendCardProps) {
     return (
         <View style={styles.friendCard}>
-            <View style={styles.avatarContainer}>
-                {avatar ? (
-                    <Image source={{ uri: avatar }} style={styles.avatar} />
-                ) : (
-                    <View style={styles.avatarPlaceholder}>
-                        <Text style={styles.avatarText}>{name.charAt(0)}</Text>
-                    </View>
-                )}
+            <View style={styles.avatarWrapper}>
+                <View style={styles.avatarContainer}>
+                    {avatar ? (
+                        <Image source={{ uri: avatar }} style={styles.avatar} />
+                    ) : (
+                        <View style={styles.avatarPlaceholder}>
+                            <Text style={styles.avatarText}>{name.charAt(0)}</Text>
+                        </View>
+                    )}
+                </View>
+                {isOnline && <View style={styles.onlineDot} />}
             </View>
             <View style={styles.friendInfo}>
                 <Text style={[typographyStyles.titleMedium, styles.friendName]}>
@@ -166,6 +171,9 @@ export default function FriendsScreen() {
         searchForUsers,
     } = useFriends(user?.id);
 
+    const friendIds = friends.map((f) => f.id);
+    const onlineMap = usePresence(friendIds);
+
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<'friends' | 'requests'>('friends');
     const [refreshing, setRefreshing] = useState(false);
@@ -258,7 +266,8 @@ export default function FriendsScreen() {
             id={item.id}
             name={item.fullName}
             mutualGroups={0}
-            avatar={item.photoURL || undefined}  // Convert null to undefined
+            avatar={item.photoURL || undefined}
+            isOnline={onlineMap[item.id] === true}
             onChat={() => {
                 Alert.alert('Chat', `Chat with ${item.fullName} coming soon`);
             }}
@@ -290,22 +299,9 @@ export default function FriendsScreen() {
             
             {/* Header */}
             <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    <View style={styles.avatarContainer}>
-                        {user?.photoURL ? (
-                            <Image source={{ uri: user.photoURL }} style={styles.headerAvatar} />
-                        ) : (
-                            <View style={styles.headerAvatarPlaceholder}>
-                                <Text style={styles.headerAvatarText}>
-                                    {user?.fullName?.charAt(0) || 'U'}
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-                    <Text style={[typographyStyles.headlineMedium, styles.headerTitle]}>
-                        Friends
-                    </Text>
-                </View>
+                <Text style={[typographyStyles.headlineMedium, styles.headerTitle]}>
+                    Friends
+                </Text>
                 <TouchableOpacity style={styles.addButton} onPress={handleAddFriend}>
                     <Ionicons name="person-add-outline" size={24} color={colors.primary} />
                 </TouchableOpacity>
@@ -452,9 +448,11 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: spacing.gutter,
-        paddingTop: spacing.md,
+        paddingTop: spacing.xxl,
         paddingBottom: spacing.md,
         backgroundColor: colors.surface,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.outlineVariant + '50',
     },
     headerLeft: {
         flexDirection: 'row',
@@ -490,11 +488,25 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         backgroundColor: colors.surface,
     },
+    avatarWrapper: {
+        position: 'relative',
+    },
     avatarContainer: {
         width: 40,
         height: 40,
         borderRadius: 20,
         overflow: 'hidden',
+    },
+    onlineDot: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        width: 11,
+        height: 11,
+        borderRadius: 6,
+        backgroundColor: '#22C55E',
+        borderWidth: 2,
+        borderColor: colors.surface,
     },
     avatar: {
         width: '100%',

@@ -37,4 +37,5 @@ export interface UserSearchResult {
   photoURL: string | null;
   isFriend: boolean;
   hasPendingRequest: boolean;
+  pendingRequestId?: string;
 }

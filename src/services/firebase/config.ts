@@ -3,7 +3,9 @@ import {
     createUserWithEmailAndPassword,
     User as FirebaseUser,
     getAuth,
+    getReactNativePersistence,
     GoogleAuthProvider,
+    initializeAuth,
     onAuthStateChanged,
     sendPasswordResetEmail,
     signInWithEmailAndPassword,
@@ -11,6 +13,7 @@ import {
     signOut,
     updateProfile
 } from 'firebase/auth';
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 import {
     addDoc,
     arrayRemove,
@@ -60,8 +63,16 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Auth
-const auth = getAuth(app);
+// Initialize Auth with AsyncStorage persistence so sessions survive app restarts
+let auth: ReturnType<typeof getAuth>;
+try {
+    auth = initializeAuth(app, {
+        persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+    });
+} catch {
+    // initializeAuth throws on hot reload — fall back to existing instance
+    auth = getAuth(app);
+}
 
 // Initialize Firestore
 const db = getFirestore(app);

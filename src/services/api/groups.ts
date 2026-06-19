@@ -135,13 +135,16 @@ export async function getUserGroups(userId: string): Promise<Group[]> {
             return [];
         }
         
-        // Fetch each group by ID
+        // Fetch each group by ID, exclude soft-deleted ones
         const groups: Group[] = [];
         for (const groupId of groupIds) {
             const groupRef = doc(db, 'groups', groupId);
             const groupSnap = await getDoc(groupRef);
             if (groupSnap.exists()) {
-                groups.push({ id: groupSnap.id, ...groupSnap.data() } as Group);
+                const groupData = { id: groupSnap.id, ...groupSnap.data() } as Group;
+                if (groupData.isActive !== false) {
+                    groups.push(groupData);
+                }
             }
         }
         

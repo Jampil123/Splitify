@@ -2,7 +2,7 @@ import { DropdownMenu } from '@/components/common/DropdownMenu';
 import { db } from '@/services/firebase/config';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
-import { Group, GroupMember } from '@/types';
+import { Group, GroupMember, Settlement } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -105,6 +105,7 @@ export default function GroupDetailsScreen() {
     
     const [group, setGroup] = useState<Group | null>(null);
     const [expenses, setExpenses] = useState<any[]>([]);
+    const [settlements, setSettlements] = useState<Settlement[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [userBalance, setUserBalance] = useState(0);
@@ -145,7 +146,13 @@ export default function GroupDetailsScreen() {
                 ...doc.data() 
             }));
             setExpenses(expensesData);
-            
+
+            // Fetch pending settlements
+            const settlementsSnap = await getDocs(
+                query(collection(db, 'groups', id, 'settlements'), where('status', '==', 'pending'))
+            );
+            setSettlements(settlementsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Settlement));
+
         } catch (error) {
             console.error('Error fetching group data:', error);
             Alert.alert('Error', 'Failed to load group data');
@@ -225,7 +232,7 @@ export default function GroupDetailsScreen() {
     const isOwes = userBalance < 0;
     const isSettled = userBalance === 0;
     
-    const balanceText = isSettled ? 'Settled' : (isOwed ? 'You are owed' : 'You owe');
+    const balanceText = isSettled ? 'Settled' : (isOwed ? 'You receive' : 'You pay');
     const balanceColor = isSettled ? colors.outline : (isOwed ? '#2E7D32' : colors.error);
     const balanceBg = isSettled ? colors.surfaceContainer : (isOwed ? '#E8F5E9' : colors.errorContainer);
 
@@ -420,7 +427,7 @@ export default function GroupDetailsScreen() {
                 </View>
 
                 {/* Suggested Settlements */}
-                {userBalance !== 0 && (
+                {settlements.length > 0 && (
                     <View style={styles.settlementCard}>
                         <View style={styles.settlementHeader}>
                             <Ionicons name="bulb" size={20} color={colors.primary} />
@@ -428,35 +435,59 @@ export default function GroupDetailsScreen() {
                                 Suggested Settlements
                             </Text>
                         </View>
-                        <View style={styles.settlementItem}>
-                            <View style={styles.settlementUsers}>
-                                <View style={styles.settlementAvatars}>
-                                    <View style={styles.settlementAvatar}>
-                                        <Text style={styles.settlementAvatarText}>S</Text>
+                        {settlements.slice(0, 3).map(s => {
+                            const fromMember = group.members.find(m => m.userId === s.fromUserId);
+                            const toMember = group.members.find(m => m.userId === s.toUserId);
+                            const isUserPayer = s.fromUserId === user?.id;
+                            const isUserReceiver = s.toUserId === user?.id;
+                            return (
+                                <TouchableOpacity
+                                    key={s.id}
+                                    style={styles.settlementItem}
+                                    onPress={() => router.push({ pathname: '/groups/[id]/settlements', params: { id } })}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={styles.settlementAvatarRow}>
+                                        <View style={[styles.settlementAvatar, { overflow: 'hidden' }]}>
+                                            {fromMember?.photoURL ? (
+                                                <Image source={{ uri: fromMember.photoURL }} style={styles.settlementAvatarImg} />
+                                            ) : (
+                                                <Text style={styles.settlementAvatarText}>{s.fromUserName.charAt(0).toUpperCase()}</Text>
+                                            )}
+                                        </View>
+                                        <Ionicons name="arrow-forward" size={12} color={colors.outline} style={{ marginHorizontal: 2 }} />
+                                        <View style={[styles.settlementAvatar, styles.settlementAvatarTo, { overflow: 'hidden' }]}>
+                                            {toMember?.photoURL ? (
+                                                <Image source={{ uri: toMember.photoURL }} style={styles.settlementAvatarImg} />
+                                            ) : (
+                                                <Text style={styles.settlementAvatarText}>{s.toUserName.charAt(0).toUpperCase()}</Text>
+                                            )}
+                                        </View>
                                     </View>
-                                    <View style={[styles.settlementAvatar, styles.settlementAvatarYou]}>
-                                        <Text style={styles.settlementAvatarText}>Y</Text>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={styles.settlementNames} numberOfLines={1}>
+                                            {isUserPayer ? 'You' : s.fromUserName.split(' ')[0]}
+                                            {' → '}
+                                            {isUserReceiver ? 'You' : s.toUserName.split(' ')[0]}
+                                        </Text>
+                                        <Text style={[styles.settlementAmount, { color: isUserPayer ? colors.error : isUserReceiver ? '#10B981' : colors.onSurfaceVariant }]}>
+                                            ₱{s.amount.toFixed(2)}
+                                        </Text>
                                     </View>
-                                </View>
-                                <Text style={[typographyStyles.bodySmall, styles.settlementText]}>
-                                    {isOwed ? 'Someone owes you' : 'You owe someone'}
-                                    <Text style={styles.settlementAmount}>
-                                        {' '}₱{Math.abs(userBalance).toFixed(2)}
-                                    </Text>
-                                </Text>
-                            </View>
-                            <TouchableOpacity
-                                style={styles.remindButton}
-                                onPress={() => router.push({ pathname: '/groups/[id]/settlements', params: { id } })}
-                            >
-                                <Text style={[typographyStyles.labelMedium, styles.remindButtonText]}>
-                                    {isOwed ? 'Request' : 'Settle'}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                        <Text style={[typographyStyles.bodySmall, styles.settlementTip]}>
-                            Tip: Settle small debts first to clear the board!
-                        </Text>
+                                    <Ionicons name="chevron-forward" size={16} color={colors.outline} />
+                                </TouchableOpacity>
+                            );
+                        })}
+                        {settlements.length > 3 && (
+                            <Text style={styles.settlementMore}>+{settlements.length - 3} more settlements</Text>
+                        )}
+                        <TouchableOpacity
+                            style={styles.viewAllSettlementsBtn}
+                            onPress={() => router.push({ pathname: '/groups/[id]/settlements', params: { id } })}
+                        >
+                            <Text style={styles.viewAllSettlementsBtnText}>View All Settlements</Text>
+                            <Ionicons name="arrow-forward-outline" size={14} color={colors.primary} />
+                        </TouchableOpacity>
                     </View>
                 )}
             </ScrollView>
@@ -483,9 +514,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: spacing.gutter,
-        paddingTop: spacing.md,
+        paddingTop: spacing.xxl,
         paddingBottom: spacing.sm,
-        backgroundColor: colors.background,
+        backgroundColor: colors.surface,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.outlineVariant + '50',
     },
     backButton: {
         padding: spacing.sm,
@@ -598,7 +631,7 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase',
     },
     balanceAmount: {
-        fontSize: 22,
+        fontSize: 18,
     },
     balanceButton: {
         paddingHorizontal: spacing.lg,
@@ -624,7 +657,7 @@ const styles = StyleSheet.create({
         color: colors.onSecondaryFixedVariant,
     },
     statValue: {
-        fontSize: 20,
+        fontSize: 18,
         color: colors.onSurface,
         marginTop: 2,
     },
@@ -831,56 +864,65 @@ const styles = StyleSheet.create({
     settlementItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        gap: spacing.sm,
         backgroundColor: colors.surfaceContainerLowest,
         padding: spacing.md,
         borderRadius: spacing.borderRadiusLg,
     },
-    settlementUsers: {
+    settlementAvatarRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.sm,
-    },
-    settlementAvatars: {
-        flexDirection: 'row',
     },
     settlementAvatar: {
         width: 32,
         height: 32,
         borderRadius: 16,
-        backgroundColor: colors.secondaryContainer,
+        backgroundColor: colors.primaryContainer,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 2,
         borderColor: colors.surfaceContainerLowest,
-        marginLeft: -8,
     },
-    settlementAvatarYou: {
-        backgroundColor: colors.primary,
+    settlementAvatarTo: {
+        backgroundColor: colors.secondaryContainer,
+    },
+    settlementAvatarImg: {
+        width: 32,
+        height: 32,
     },
     settlementAvatarText: {
         fontSize: 12,
         fontWeight: 'bold',
         color: colors.onPrimary,
     },
-    settlementText: {
-        color: colors.onSurfaceVariant,
+    settlementNames: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: colors.onSurface,
+        fontFamily: 'Poppins_600SemiBold',
     },
     settlementAmount: {
-        fontWeight: 'bold',
-        color: colors.primary,
+        fontSize: 12,
+        fontWeight: '700',
+        fontFamily: 'Poppins_700Bold',
     },
-    remindButton: {
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.xs,
-    },
-    remindButtonText: {
-        color: colors.primary,
-        fontWeight: '600',
-    },
-    settlementTip: {
-        color: colors.secondary,
+    settlementMore: {
         textAlign: 'center',
-        fontStyle: 'italic',
+        color: colors.outline,
+        fontSize: 12,
+        fontFamily: 'Poppins_400Regular',
+    },
+    viewAllSettlementsBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: spacing.xs,
+        gap: 4,
+    },
+    viewAllSettlementsBtnText: {
+        color: colors.primary,
+        fontSize: 13,
+        fontWeight: '600',
+        fontFamily: 'Poppins_600SemiBold',
     },
 });
