@@ -1,4 +1,4 @@
-import { colors, spacing } from '@/styles';
+﻿import { colors, spacing } from '@/styles';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -101,6 +101,6 @@ const styles = StyleSheet.create({
     },
     label: {
         fontSize: 11,
-        fontFamily: 'Inter_500Medium',
+        fontFamily: 'Poppins_500Medium',
     },
 });

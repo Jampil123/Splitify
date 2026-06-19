@@ -1,4 +1,4 @@
-import { db } from '@/services/firebase/config';
+﻿import { db } from '@/services/firebase/config';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
 import { Group, Settlement, UserBalance } from '@/types';
@@ -302,21 +302,21 @@ const s = StyleSheet.create({
     },
     heroLabel: {
         fontSize: 11, fontWeight: '600', color: colors.onSurfaceVariant,
-        letterSpacing: 1.5, fontFamily: 'Inter_600SemiBold',
+        letterSpacing: 1.5, fontFamily: 'Poppins_600SemiBold',
     },
     heroAmount: {
         fontSize: 52, fontWeight: '800', lineHeight: 60,
-        fontFamily: 'Inter_800ExtraBold',
+        fontFamily: 'Poppins_800ExtraBold',
     },
-    heroStatus: { fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold', marginBottom: 4 },
+    heroStatus: { fontSize: 13, fontWeight: '600', fontFamily: 'Poppins_600SemiBold', marginBottom: 4 },
     heroStats: {
         flexDirection: 'row', width: '100%', marginTop: spacing.sm,
         backgroundColor: 'rgba(255,255,255,0.55)', borderRadius: spacing.borderRadiusMd,
         paddingVertical: spacing.sm,
     },
     heroStat: { flex: 1, alignItems: 'center' },
-    heroStatLabel: { fontSize: 11, color: colors.onSurfaceVariant, fontFamily: 'Inter_400Regular' },
-    heroStatValue: { fontSize: 14, fontWeight: '700', color: colors.onSurface, fontFamily: 'Inter_700Bold' },
+    heroStatLabel: { fontSize: 11, color: colors.onSurfaceVariant, fontFamily: 'Poppins_400Regular' },
+    heroStatValue: { fontSize: 14, fontWeight: '700', color: colors.onSurface, fontFamily: 'Poppins_700Bold' },
     heroStatDivider: { width: 1, backgroundColor: colors.outlineVariant + '50' },
     // Tabs
     tabs: {
@@ -329,7 +329,7 @@ const s = StyleSheet.create({
         shadowColor: colors.onSurface, shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
     },
-    tabText: { fontSize: 13, fontWeight: '500', color: colors.onSurfaceVariant, fontFamily: 'Inter_500Medium' },
+    tabText: { fontSize: 13, fontWeight: '500', color: colors.onSurfaceVariant, fontFamily: 'Poppins_500Medium' },
     tabTextActive: { color: colors.primary },
     // Members list
     card: {
@@ -346,31 +346,31 @@ const s = StyleSheet.create({
         alignItems: 'center', justifyContent: 'center', flexShrink: 0,
     },
     avatarYou: { borderWidth: 2, borderColor: colors.primary },
-    avatarText: { fontSize: 16, fontWeight: '700', color: colors.onPrimary, fontFamily: 'Inter_700Bold' },
+    avatarText: { fontSize: 16, fontWeight: '700', color: colors.onPrimary, fontFamily: 'Poppins_700Bold' },
     memberInfo: { flex: 1 },
-    memberName: { fontSize: 14, fontWeight: '600', color: colors.onSurface, fontFamily: 'Inter_600SemiBold' },
-    memberLabel: { fontSize: 12, color: colors.onSurfaceVariant, fontFamily: 'Inter_400Regular', marginTop: 1 },
-    memberAmount: { fontSize: 15, fontWeight: '700', fontFamily: 'Inter_700Bold', flexShrink: 0 },
-    emptyNote: { textAlign: 'center', color: colors.outline, padding: spacing.lg, fontFamily: 'Inter_400Regular' },
+    memberName: { fontSize: 14, fontWeight: '600', color: colors.onSurface, fontFamily: 'Poppins_600SemiBold' },
+    memberLabel: { fontSize: 12, color: colors.onSurfaceVariant, fontFamily: 'Poppins_400Regular', marginTop: 1 },
+    memberAmount: { fontSize: 15, fontWeight: '700', fontFamily: 'Poppins_700Bold', flexShrink: 0 },
+    emptyNote: { textAlign: 'center', color: colors.outline, padding: spacing.lg, fontFamily: 'Poppins_400Regular' },
     // My Payments
     paySection: { gap: spacing.md },
     sectionLabel: {
         fontSize: 11, fontWeight: '600', color: colors.onSurfaceVariant,
-        letterSpacing: 0.8, marginBottom: 6, fontFamily: 'Inter_600SemiBold',
+        letterSpacing: 0.8, marginBottom: 6, fontFamily: 'Poppins_600SemiBold',
     },
     payRow: {
         flexDirection: 'row', alignItems: 'center', borderRadius: spacing.borderRadiusLg,
         padding: spacing.md, gap: spacing.sm, marginBottom: spacing.sm,
     },
     payInfo: { flex: 1 },
-    payLabel: { fontSize: 11, color: colors.onSurfaceVariant, fontFamily: 'Inter_400Regular' },
-    payName: { fontSize: 14, fontWeight: '600', color: colors.onSurface, fontFamily: 'Inter_600SemiBold' },
+    payLabel: { fontSize: 11, color: colors.onSurfaceVariant, fontFamily: 'Poppins_400Regular' },
+    payName: { fontSize: 14, fontWeight: '600', color: colors.onSurface, fontFamily: 'Poppins_600SemiBold' },
     payRight: { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
-    payAmount: { fontSize: 15, fontWeight: '700', fontFamily: 'Inter_700Bold' },
+    payAmount: { fontSize: 15, fontWeight: '700', fontFamily: 'Poppins_700Bold' },
     payBtn: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: spacing.borderRadiusFull },
     payBtnRed: { backgroundColor: colors.error },
     payBtnGreen: { borderWidth: 1, borderColor: '#10B981' },
-    payBtnText: { fontSize: 11, fontWeight: '600', color: colors.onPrimary, fontFamily: 'Inter_600SemiBold' },
+    payBtnText: { fontSize: 11, fontWeight: '600', color: colors.onPrimary, fontFamily: 'Poppins_600SemiBold' },
     payBtnTextGreen: { color: '#10B981' },
     emptyCard: {
         backgroundColor: colors.surfaceContainerLowest, borderRadius: spacing.borderRadiusLg,
@@ -384,5 +384,5 @@ const s = StyleSheet.create({
         shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2, shadowRadius: 8, elevation: 4,
     },
-    settleBtnText: { fontSize: 15, fontWeight: '600', color: colors.onPrimary, fontFamily: 'Inter_600SemiBold' },
+    settleBtnText: { fontSize: 15, fontWeight: '600', color: colors.onPrimary, fontFamily: 'Poppins_600SemiBold' },
 });

@@ -1,4 +1,4 @@
-import { resetPassword } from '@/services/firebase/auth';
+﻿import { resetPassword } from '@/services/firebase/auth';
 import { colors, spacing, typographyStyles } from '@/styles';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.md,
         fontSize: 16,
-        fontFamily: 'Inter_400Regular',
+        fontFamily: 'Poppins_400Regular',
         color: colors.onSurface,
     },
     inputError: {

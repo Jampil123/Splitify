@@ -4,12 +4,11 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  Image,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Animated,
+    Image,
+    StyleSheet,
+    View
 } from 'react-native';
 
 // Key for checking if user has seen onboarding
@@ -112,10 +111,6 @@ export default function SplashScreen() {
                         style={styles.logoImage}
                     />
                 </Animated.View>
-
-                <Text style={[typographyStyles.headlineLarge, styles.brandName]}>
-                    Splitify
-                </Text>
 
                 <Animated.Text style={[typographyStyles.bodyLarge, styles.tagline, { opacity: taglineOpacity }]}>
                     Split expenses. Stay friends.

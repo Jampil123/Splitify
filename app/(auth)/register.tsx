@@ -1,6 +1,7 @@
-import { registerWithEmail, signInWithGoogle } from '@/services/firebase/auth';
+﻿import { registerWithEmail, signInWithGoogle } from '@/services/firebase/auth';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
@@ -26,8 +27,11 @@ export default function RegisterScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [agreeToTerms, setAgreeToTerms] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [registerSuccess, setRegisterSuccess] = useState(false);
     const [errors, setErrors] = useState({
         fullName: '',
         email: '',
@@ -104,11 +108,10 @@ export default function RegisterScreen() {
             });
             
             if (result.success && result.user) {
-                Alert.alert(
-                    'Account Created',
-                    'Your account has been created successfully!',
-                    // [{ text: 'OK', onPress: () => router.replace('/(tabs)/home') }]
-                );
+                setRegisterSuccess(true);
+                setTimeout(() => {
+                    router.replace('/(auth)/login');
+                }, 3000);
             } else {
                 Alert.alert('Registration Failed', result.error || 'Please try again');
             }
@@ -165,12 +168,7 @@ export default function RegisterScreen() {
                 {/* Header */}
                 <View style={styles.header}>
                     <View style={styles.logoContainer}>
-                        <View style={styles.logoWrapper}>
-                            <Image
-                                source={require('@/assets/images/splitify-logo.png')}
-                                style={styles.logoImage}
-                            />
-                        </View>
+                
                     </View>
                     <Text style={[typographyStyles.headlineMedium, styles.title]}>
                         Create Account
@@ -180,8 +178,28 @@ export default function RegisterScreen() {
                     </Text>
                 </View>
 
+                {/* Success State */}
+                {registerSuccess ? (
+                    <View style={styles.successCard}>
+                        <View style={styles.successIconWrap}>
+                            <Ionicons name="checkmark-circle" size={72} color="#10B981" />
+                        </View>
+                        <Text style={[typographyStyles.headlineMedium, styles.successTitle]}>
+                            Account Created!
+                        </Text>
+                        <Text style={[typographyStyles.bodyMedium, styles.successSubtitle]}>
+                            Your account has been set up successfully. You'll be redirected to sign in shortly.
+                        </Text>
+                        <View style={styles.successDivider} />
+                        <ActivityIndicator color={colors.primaryContainer} size="small" />
+                        <Text style={[typographyStyles.bodySmall, styles.successRedirectText]}>
+                            Redirecting to Sign In...
+                        </Text>
+                    </View>
+                ) : null}
+
                 {/* Registration Card */}
-                <View style={styles.card}>
+                {!registerSuccess && <View style={styles.card}>
                     {/* Full Name Field */}
                     <View style={styles.inputGroup}>
                         <Text style={[typographyStyles.labelMedium, styles.label]}>
@@ -237,24 +255,35 @@ export default function RegisterScreen() {
                         <Text style={[typographyStyles.labelMedium, styles.label]}>
                             Password
                         </Text>
-                        <TextInput
-                            style={[
-                                styles.input,
-                                errors.password ? styles.inputError : null
-                            ]}
-                            placeholder="••••••••"
-                            placeholderTextColor={colors.outline}
-                            value={password}
-                            onChangeText={(text) => {
-                                setPassword(text);
-                                if (errors.password) setErrors({ ...errors, password: '' });
-                            }}
-                            secureTextEntry
-                            editable={!isLoading}
-                        />
-                        <Text style={styles.passwordHint}>
-                            Min. 6 characters
-                        </Text>
+                        <View style={styles.passwordContainer}>
+                            <TextInput
+                                style={[
+                                    styles.input,
+                                    styles.passwordInput,
+                                    errors.password ? styles.inputError : null
+                                ]}
+                                placeholder="••••••••"
+                                placeholderTextColor={colors.outline}
+                                value={password}
+                                onChangeText={(text) => {
+                                    setPassword(text);
+                                    if (errors.password) setErrors({ ...errors, password: '' });
+                                }}
+                                secureTextEntry={!showPassword}
+                                editable={!isLoading}
+                            />
+                            <TouchableOpacity
+                                style={styles.eyeIcon}
+                                onPress={() => setShowPassword(!showPassword)}
+                            >
+                                <Ionicons
+                                    name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                                    size={20}
+                                    color={colors.outline}
+                                />
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={styles.passwordHint}>Min. 6 characters</Text>
                         {errors.password ? (
                             <Text style={styles.errorText}>{errors.password}</Text>
                         ) : null}
@@ -265,21 +294,34 @@ export default function RegisterScreen() {
                         <Text style={[typographyStyles.labelMedium, styles.label]}>
                             Confirm Password
                         </Text>
-                        <TextInput
-                            style={[
-                                styles.input,
-                                errors.confirmPassword ? styles.inputError : null
-                            ]}
-                            placeholder="••••••••"
-                            placeholderTextColor={colors.outline}
-                            value={confirmPassword}
-                            onChangeText={(text) => {
-                                setConfirmPassword(text);
-                                if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: '' });
-                            }}
-                            secureTextEntry
-                            editable={!isLoading}
-                        />
+                        <View style={styles.passwordContainer}>
+                            <TextInput
+                                style={[
+                                    styles.input,
+                                    styles.passwordInput,
+                                    errors.confirmPassword ? styles.inputError : null
+                                ]}
+                                placeholder="••••••••"
+                                placeholderTextColor={colors.outline}
+                                value={confirmPassword}
+                                onChangeText={(text) => {
+                                    setConfirmPassword(text);
+                                    if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: '' });
+                                }}
+                                secureTextEntry={!showConfirmPassword}
+                                editable={!isLoading}
+                            />
+                            <TouchableOpacity
+                                style={styles.eyeIcon}
+                                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                            >
+                                <Ionicons
+                                    name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'}
+                                    size={20}
+                                    color={colors.outline}
+                                />
+                            </TouchableOpacity>
+                        </View>
                         {errors.confirmPassword ? (
                             <Text style={styles.errorText}>{errors.confirmPassword}</Text>
                         ) : null}
@@ -358,19 +400,21 @@ export default function RegisterScreen() {
                             Continue with Google
                         </Text>
                     </TouchableOpacity>
-                </View>
+                </View>}
 
                 {/* Footer Link */}
-                <View style={styles.footer}>
-                    <Text style={[typographyStyles.bodySmall, styles.footerText]}>
-                        Already have an account?{' '}
-                    </Text>
-                    <TouchableOpacity onPress={handleSignIn}>
-                        <Text style={[typographyStyles.labelMedium, styles.signInText]}>
-                            Sign In
+                {!registerSuccess && (
+                    <View style={styles.footer}>
+                        <Text style={[typographyStyles.bodySmall, styles.footerText]}>
+                            Already have an account?{' '}
                         </Text>
-                    </TouchableOpacity>
-                </View>
+                        <TouchableOpacity onPress={handleSignIn}>
+                            <Text style={[typographyStyles.labelMedium, styles.signInText]}>
+                                Sign In
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -386,6 +430,41 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.gutter,
         paddingTop: spacing.xl,
         paddingBottom: spacing.xl,
+    },
+    // Success state styles
+    successCard: {
+        backgroundColor: colors.secondaryContainer,
+        borderRadius: spacing.borderRadiusLg,
+        padding: spacing.xl,
+        alignItems: 'center',
+        gap: spacing.md,
+        shadowColor: colors.onSurface,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 12,
+        elevation: 3,
+    },
+    successIconWrap: {
+        marginBottom: spacing.sm,
+    },
+    successTitle: {
+        color: colors.onSurface,
+        textAlign: 'center',
+    },
+    successSubtitle: {
+        color: colors.onSurfaceVariant,
+        textAlign: 'center',
+        lineHeight: 22,
+    },
+    successDivider: {
+        width: 40,
+        height: 1,
+        backgroundColor: colors.outlineVariant,
+        marginVertical: spacing.xs,
+    },
+    successRedirectText: {
+        color: colors.outline,
+        textAlign: 'center',
     },
     // Header styles
     header: {
@@ -447,11 +526,22 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.sm,
         height: 48,
         fontSize: 14,
-        fontFamily: 'Inter_400Regular',
+        fontFamily: 'Poppins_400Regular',
         color: colors.onSurface,
     },
     inputError: {
         borderColor: colors.error,
+    },
+    passwordContainer: {
+        position: 'relative',
+    },
+    passwordInput: {
+        paddingRight: 48,
+    },
+    eyeIcon: {
+        position: 'absolute',
+        right: spacing.md,
+        top: 14,
     },
     errorText: {
         fontSize: 12,
@@ -547,10 +637,10 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         backgroundColor: colors.surface,
         borderWidth: 1,
-        borderColor: colors.onSurface,
+        borderColor: colors.outlineVariant,
         borderRadius: spacing.borderRadiusFull,
-        height: 48,
-        gap: spacing.sm,
+        paddingVertical: spacing.md,
+        gap: spacing.md,
     },
     googleIconContainer: {
         width: 20,
@@ -561,6 +651,12 @@ const styles = StyleSheet.create({
     googleIconImage: {
         width: 20,
         height: 20,
+        resizeMode: 'contain',
+    },
+    googleIcon: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: colors.onSurface,
     },
     googleText: {
         color: colors.onSurface,

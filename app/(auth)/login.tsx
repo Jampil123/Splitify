@@ -1,6 +1,7 @@
-import { loginWithEmail, signInWithGoogle } from '@/services/firebase/auth';
+﻿import { loginWithEmail, signInWithGoogle } from '@/services/firebase/auth';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
@@ -27,6 +28,7 @@ export default function LoginScreen() {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [errors, setErrors] = useState({ email: '', password: '' });
+    const [loginError, setLoginError] = useState('');
 
     const validateForm = () => {
         let isValid = true;
@@ -55,29 +57,21 @@ export default function LoginScreen() {
     const handleLogin = async () => {
         if (!validateForm()) return;
 
-        console.log('🔐 Login: Starting login process');
+        setLoginError('');
         setIsLoading(true);
-        
+
         try {
             const result = await loginWithEmail({ email, password });
-            console.log('🔐 Login: Result', result.success, result.user?.uid);
-            
+
             if (result.success && result.user) {
-                // Wait a moment for the auth state to update
-                console.log('🔐 Login: Success, waiting for auth state...');
-                
-                // Force wait for auth state to propagate
                 setTimeout(() => {
-                    console.log('🔐 Login: Navigating to home');
                     router.replace('/home');
                 }, 500);
             } else {
-                console.log('🔐 Login: Failed', result.error);
-                Alert.alert('Login Failed', result.error || 'Invalid email or password');
+                setLoginError(result.error || 'Invalid email or password. Please try again.');
             }
         } catch (error: any) {
-            console.error('🔐 Login: Error', error);
-            Alert.alert('Error', error.message || 'Something went wrong');
+            setLoginError(error.message || 'Something went wrong. Please try again.');
         } finally {
             setIsLoading(false);
         }
@@ -135,12 +129,10 @@ export default function LoginScreen() {
                 {/* Header Section */}
                 <View style={styles.header}>
                     <View style={styles.logoContainer}>
-                        <View style={styles.logoWrapper}>
-                            <Image
-                                source={require('@/assets/images/splitify-logo.png')}
-                                style={styles.logoImage}
-                            />
-                        </View>
+                        <Image
+                            source={require('@/assets/images/splitify-logo.png')}
+                            style={styles.logoImage}
+                        />
                     </View>
                     <Text style={[typographyStyles.headlineMedium, styles.title]}>
                         Welcome Back
@@ -168,6 +160,7 @@ export default function LoginScreen() {
                             onChangeText={(text) => {
                                 setEmail(text);
                                 if (errors.email) setErrors({ ...errors, email: '' });
+                                if (loginError) setLoginError('');
                             }}
                             autoCapitalize="none"
                             keyboardType="email-address"
@@ -192,6 +185,7 @@ export default function LoginScreen() {
                                 onChangeText={(text) => {
                                     setPassword(text);
                                     if (errors.password) setErrors({ ...errors, password: '' });
+                                    if (loginError) setLoginError('');
                                 }}
                                 secureTextEntry={!showPassword}
                                 editable={!isLoading}
@@ -200,9 +194,11 @@ export default function LoginScreen() {
                                 style={styles.eyeIcon}
                                 onPress={() => setShowPassword(!showPassword)}
                             >
-                                <Text style={styles.eyeIconText}>
-                                    {showPassword ? '👁️' : '👁️‍🗨️'}
-                                </Text>
+                                <Ionicons
+                                    name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                                    size={20}
+                                    color={colors.outline}
+                                />
                             </TouchableOpacity>
                         </View>
                         {errors.password ? (
@@ -218,6 +214,14 @@ export default function LoginScreen() {
                             </Text>
                         </TouchableOpacity>
                     </View>
+
+                    {/* Inline login error */}
+                    {loginError ? (
+                        <View style={styles.loginErrorBanner}>
+                            <Ionicons name="alert-circle-outline" size={16} color={colors.error} />
+                            <Text style={styles.loginErrorText}>{loginError}</Text>
+                        </View>
+                    ) : null}
 
                     {/* Sign In Button */}
                     <TouchableOpacity
@@ -318,19 +322,11 @@ const styles = StyleSheet.create({
     },
     logoContainer: {
         marginBottom: spacing.md,
-    },
-    logoWrapper: {
-        width: 60,
-        height: 60,
-        borderRadius: spacing.borderRadiusLg,
-        backgroundColor: colors.primaryFixed,
         alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
     },
     logoImage: {
-        width: 60,
-        height: 60,
+        width: 120,
+        height: 120,
         resizeMode: 'contain',
     },
     title: {
@@ -368,7 +364,7 @@ const styles = StyleSheet.create({
         borderRadius: spacing.borderRadiusLg,
         padding: spacing.md,
         fontSize: 14,
-        fontFamily: 'Inter_400Regular',
+        fontFamily: 'Poppins_400Regular',
         color: colors.onSurface,
     },
     inputError: {
@@ -392,10 +388,6 @@ const styles = StyleSheet.create({
         top: '50%',
         transform: [{ translateY: -12 }],
     },
-    eyeIconText: {
-        fontSize: 20,
-        color: colors.outline,
-    },
     forgotButton: {
         alignSelf: 'flex-end',
         marginTop: spacing.xs,
@@ -403,13 +395,33 @@ const styles = StyleSheet.create({
     forgotText: {
         color: colors.primary,
     },
+    loginErrorBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        backgroundColor: colors.error + '15',
+        borderWidth: 1,
+        borderColor: colors.error + '40',
+        borderRadius: spacing.borderRadiusMd,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        marginBottom: spacing.sm,
+    },
+    loginErrorText: {
+        flex: 1,
+        fontSize: 13,
+        color: colors.error,
+        fontFamily: 'Poppins_400Regular',
+        lineHeight: 18,
+    },
     // Button styles
     signInButton: {
         backgroundColor: colors.primaryContainer,
-        paddingVertical: spacing.md,
+        height: 48,
         borderRadius: spacing.borderRadiusFull,
         alignItems: 'center',
-        marginTop: spacing.md,
+        justifyContent: 'center',
+        marginTop: spacing.sm,
         shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,

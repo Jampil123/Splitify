@@ -1,4 +1,4 @@
-import { db } from '@/services/firebase/config';
+﻿import { db } from '@/services/firebase/config';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
 import { Expense } from '@/types';
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingVertical: spacing.md,
         fontSize: 16,
-        fontFamily: 'Inter_400Regular',
+        fontFamily: 'Poppins_400Regular',
         color: colors.onSurface,
     },
     filtersContainer: {

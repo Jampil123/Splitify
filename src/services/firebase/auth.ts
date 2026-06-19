@@ -31,22 +31,28 @@ export async function loginWithEmail({ email, password }: LoginData) {
     
     return { success: true, user, error: null };
   } catch (error: any) {
-    let message = 'Login failed';
+    let message = 'Invalid account or password';
     switch (error.code) {
       case 'auth/user-not-found':
-        message = 'User not found';
+        message = 'Invalid account. No user found with this email.';
         break;
       case 'auth/wrong-password':
-        message = 'Invalid password';
+        message = 'Incorrect password. Please try again.';
+        break;
+      case 'auth/invalid-credential':
+        message = 'Invalid account or password. Please check your credentials.';
         break;
       case 'auth/invalid-email':
-        message = 'Invalid email format';
+        message = 'Please enter a valid email address.';
         break;
       case 'auth/user-disabled':
-        message = 'Account disabled';
+        message = 'This account has been disabled. Contact support.';
+        break;
+      case 'auth/too-many-requests':
+        message = 'Too many failed attempts. Please try again later.';
         break;
       default:
-        message = error.message;
+        message = 'Invalid account or password. Please try again.';
     }
     return { success: false, user: null, error: message };
   }

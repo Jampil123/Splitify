@@ -1,4 +1,4 @@
-import { useNotifications } from '@/services/hooks/useNotifications';
+﻿import { useNotifications } from '@/services/hooks/useNotifications';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing } from '@/styles';
 import { formatRelativeTime } from '@/utils/dateHelpers';
@@ -234,16 +234,16 @@ const s = StyleSheet.create({
     },
     headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     headerTitle: {
-        fontSize: 20, fontWeight: '700', color: colors.primary, fontFamily: 'Inter_700Bold',
+        fontSize: 20, fontWeight: '700', color: colors.primary, fontFamily: 'Poppins_700Bold',
     },
     badge: {
         backgroundColor: colors.error, borderRadius: 10,
         paddingHorizontal: 6, paddingVertical: 1,
         minWidth: 20, alignItems: 'center',
     },
-    badgeText: { fontSize: 11, fontWeight: '700', color: colors.onPrimary, fontFamily: 'Inter_700Bold' },
+    badgeText: { fontSize: 11, fontWeight: '700', color: colors.onPrimary, fontFamily: 'Poppins_700Bold' },
     markAll: {
-        fontSize: 13, color: colors.primary, fontFamily: 'Inter_500Medium',
+        fontSize: 13, color: colors.primary, fontFamily: 'Poppins_500Medium',
     },
     // Filters
     filters: {
@@ -257,13 +257,13 @@ const s = StyleSheet.create({
         justifyContent: 'center', alignItems: 'center',
     },
     chipActive: { backgroundColor: colors.primary },
-    chipText: { fontSize: 12, fontWeight: '500', color: colors.onSurfaceVariant, fontFamily: 'Inter_500Medium' },
+    chipText: { fontSize: 12, fontWeight: '500', color: colors.onSurfaceVariant, fontFamily: 'Poppins_500Medium' },
     chipTextActive: { color: colors.onPrimary },
     // Sections
     sectionTitle: {
         fontSize: 11, fontWeight: '600', color: colors.onSurfaceVariant,
         paddingHorizontal: spacing.gutter, paddingTop: spacing.md, paddingBottom: spacing.sm,
-        fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.8,
+        fontFamily: 'Poppins_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.8,
     },
     // Items
     item: {
@@ -284,14 +284,14 @@ const s = StyleSheet.create({
     },
     itemTitle: {
         fontSize: 14, fontWeight: '600', color: colors.onSurface,
-        fontFamily: 'Inter_600SemiBold', flex: 1,
+        fontFamily: 'Poppins_600SemiBold', flex: 1,
     },
     itemTime: {
-        fontSize: 11, color: colors.outline, fontFamily: 'Inter_400Regular', flexShrink: 0, marginTop: 1,
+        fontSize: 11, color: colors.outline, fontFamily: 'Poppins_400Regular', flexShrink: 0, marginTop: 1,
     },
     itemBody: {
         fontSize: 13, color: colors.onSurfaceVariant, lineHeight: 18,
-        fontFamily: 'Inter_400Regular',
+        fontFamily: 'Poppins_400Regular',
     },
     dot: {
         width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary,
@@ -306,9 +306,9 @@ const s = StyleSheet.create({
         alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm,
     },
     emptyTitle: {
-        fontSize: 17, fontWeight: '700', color: colors.onSurface, fontFamily: 'Inter_700Bold',
+        fontSize: 17, fontWeight: '700', color: colors.onSurface, fontFamily: 'Poppins_700Bold',
     },
     emptyText: {
-        fontSize: 13, color: colors.onSurfaceVariant, fontFamily: 'Inter_400Regular',
+        fontSize: 13, color: colors.onSurfaceVariant, fontFamily: 'Poppins_400Regular',
     },
 });

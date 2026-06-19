@@ -2,12 +2,11 @@ import { StyleSheet } from 'react-native';
 
 // Font family mappings
 export const fontFamilies = {
-    // Inter fonts
-    regular: 'Inter_400Regular',
-    medium: 'Inter_500Medium',
-    semiBold: 'Inter_600SemiBold',
-    bold: 'Inter_700Bold',
-    extraBold: 'Inter_800ExtraBold',
+    regular: 'Poppins_400Regular',
+    medium: 'Poppins_500Medium',
+    semiBold: 'Poppins_600SemiBold',
+    bold: 'Poppins_700Bold',
+    extraBold: 'Poppins_800ExtraBold',
 };
 
 // Typography styles

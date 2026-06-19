@@ -65,32 +65,39 @@ export default function WelcomeScreen() {
         router.replace('/(auth)/login');
     };
 
-    const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-        const offsetX = event.nativeEvent.contentOffset.x;
-        const index = Math.round(offsetX / width);
-        setCurrentIndex(index);
-    };
+    const handleScroll = Animated.event(
+        [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+        {
+            useNativeDriver: false,
+            listener: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+                const offsetX = event.nativeEvent.contentOffset.x;
+                setCurrentIndex(Math.round(offsetX / width));
+            },
+        }
+    );
 
-    const renderDots = () => {
-        return (
-            <View style={styles.dotContainer}>
-                {onboardingData.map((_, i) => (
-                    <View
+    const renderDots = () => (
+        <View style={styles.dotContainer}>
+            {onboardingData.map((_, i) => {
+                const dotWidth = scrollX.interpolate({
+                    inputRange: [(i - 1) * width, i * width, (i + 1) * width],
+                    outputRange: [8, 24, 8],
+                    extrapolate: 'clamp',
+                });
+                const dotOpacity = scrollX.interpolate({
+                    inputRange: [(i - 1) * width, i * width, (i + 1) * width],
+                    outputRange: [0.35, 1, 0.35],
+                    extrapolate: 'clamp',
+                });
+                return (
+                    <Animated.View
                         key={i}
-                        style={[
-                            styles.dot,
-                            {
-                                width: currentIndex === i ? 24 : 8,
-                                backgroundColor: currentIndex === i 
-                                    ? colors.primary 
-                                    : colors.outlineVariant,
-                            },
-                        ]}
+                        style={[styles.dot, { width: dotWidth, opacity: dotOpacity, backgroundColor: colors.primary }]}
                     />
-                ))}
-            </View>
-        );
-    };
+                );
+            })}
+        </View>
+    );
 
     return (
         <View style={styles.container}>

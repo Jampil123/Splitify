@@ -1,4 +1,4 @@
-import { useFriends } from '@/services/hooks/useFriends';
+﻿import { useFriends } from '@/services/hooks/useFriends';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
 import { Ionicons } from '@expo/vector-icons';
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.md,
         fontSize: 16,
-        fontFamily: 'Inter_400Regular',
+        fontFamily: 'Poppins_400Regular',
         color: colors.onSurface,
     },
     searchButton: {

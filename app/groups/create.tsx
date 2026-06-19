@@ -1,4 +1,4 @@
-import { db } from '@/services/firebase/config';
+﻿import { db } from '@/services/firebase/config';
 import { useFriends } from '@/services/hooks/useFriends';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.md,
         fontSize: 16,
-        fontFamily: 'Inter_400Regular',
+        fontFamily: 'Poppins_400Regular',
         color: colors.onSurface,
         paddingRight: 50,
     },
@@ -841,7 +841,7 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.md,
         paddingHorizontal: spacing.sm,
         fontSize: 16,
-        fontFamily: 'Inter_400Regular',
+        fontFamily: 'Poppins_400Regular',
         color: colors.onSurface,
     },
     friendsList: {

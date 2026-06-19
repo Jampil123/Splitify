@@ -1,4 +1,4 @@
-import { refreshSettlementSuggestions } from '@/services/api/settlements';
+﻿import { refreshSettlementSuggestions } from '@/services/api/settlements';
 import { db } from '@/services/firebase/config';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
@@ -647,7 +647,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.md,
         fontSize: 16,
-        fontFamily: 'Inter_400Regular',
+        fontFamily: 'Poppins_400Regular',
         color: colors.onSurface,
         paddingRight: 48,
     },

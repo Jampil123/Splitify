@@ -1,4 +1,4 @@
-import { deleteGroup, updateGroup } from '@/services/api/groups';
+﻿import { deleteGroup, updateGroup } from '@/services/api/groups';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
 import { Ionicons } from '@expo/vector-icons';
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
     },
     saveBtnText: {
         color: colors.onPrimary,
-        fontFamily: 'Inter_600SemiBold',
+        fontFamily: 'Poppins_600SemiBold',
         fontSize: 14,
     },
     scrollContent: {
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
     },
     avatarText: {
         fontSize: 36,
-        fontFamily: 'Inter_700Bold',
+        fontFamily: 'Poppins_700Bold',
         color: colors.onPrimary,
     },
     avatarEdit: {
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.md,
         fontSize: 16,
-        fontFamily: 'Inter_400Regular',
+        fontFamily: 'Poppins_400Regular',
         color: colors.onSurface,
     },
     textArea: {
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     },
     dangerLabel: {
         color: colors.error,
-        fontFamily: 'Inter_600SemiBold',
+        fontFamily: 'Poppins_600SemiBold',
     },
     dangerSub: {
         color: colors.onSurfaceVariant,

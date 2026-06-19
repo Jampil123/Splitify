@@ -2,7 +2,7 @@ import { getCurrentUserData } from '@/services/firebase/auth';
 import { auth, onAuthStateChanged } from '@/services/firebase/config';
 import { useAuthStore } from '@/stores/authStore';
 import { colors } from '@/styles';
-import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, Inter_800ExtraBold, useFonts } from '@expo-google-fonts/inter';
+import { Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold, Poppins_800ExtraBold, useFonts } from '@expo-google-fonts/poppins';
 import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
@@ -12,11 +12,11 @@ export default function RootLayout() {
     const [isAuthChecked, setIsAuthChecked] = useState(false);
 
     const [fontsLoaded] = useFonts({
-        Inter_400Regular,
-        Inter_500Medium,
-        Inter_600SemiBold,
-        Inter_700Bold,
-        Inter_800ExtraBold,
+        Poppins_400Regular,
+        Poppins_500Medium,
+        Poppins_600SemiBold,
+        Poppins_700Bold,
+        Poppins_800ExtraBold,
     });
 
     useEffect(() => {
@@ -47,7 +47,7 @@ export default function RootLayout() {
         return (
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
                 <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={{ marginTop: 10, color: colors.outline, fontFamily: 'Inter_400Regular' }}>
+                <Text style={{ marginTop: 10, color: colors.outline, fontFamily: 'Poppins_400Regular' }}>
                     Loading...
                 </Text>
             </View>
@@ -62,7 +62,7 @@ export default function RootLayout() {
                 },
                 headerTintColor: colors.onSurface,
                 headerTitleStyle: {
-                    fontFamily: 'Inter_600SemiBold',
+                    fontFamily: 'Poppins_600SemiBold',
                     fontSize: 18,
                 },
                 headerShadowVisible: false,

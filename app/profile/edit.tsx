@@ -1,4 +1,4 @@
-import { updateUserProfile } from '@/services/firebase/auth';
+﻿import { updateUserProfile } from '@/services/firebase/auth';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
 import { Ionicons } from '@expo/vector-icons';
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
     },
     saveBtnText: {
         color: colors.onPrimary,
-        fontFamily: 'Inter_600SemiBold',
+        fontFamily: 'Poppins_600SemiBold',
         fontSize: 14,
     },
     scrollContent: {
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     },
     avatarText: {
         fontSize: 40,
-        fontFamily: 'Inter_700Bold',
+        fontFamily: 'Poppins_700Bold',
         color: colors.onPrimary,
     },
     avatarEdit: {
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.md,
         fontSize: 16,
-        fontFamily: 'Inter_400Regular',
+        fontFamily: 'Poppins_400Regular',
         color: colors.onSurface,
     },
     disabledInput: {
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
     },
     disabledText: {
         fontSize: 16,
-        fontFamily: 'Inter_400Regular',
+        fontFamily: 'Poppins_400Regular',
         color: colors.outline,
     },
     fieldHint: {
@@ -335,6 +335,6 @@ const styles = StyleSheet.create({
     logoutText: {
         color: colors.error,
         flex: 1,
-        fontFamily: 'Inter_600SemiBold',
+        fontFamily: 'Poppins_600SemiBold',
     },
 });

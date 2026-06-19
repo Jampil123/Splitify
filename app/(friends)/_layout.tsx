@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+﻿import { Stack } from 'expo-router';
 
 export default function FriendsLayout() {
     return (
@@ -9,7 +9,7 @@ export default function FriendsLayout() {
                 },
                 headerTintColor: '#081E2A',
                 headerTitleStyle: {
-                    fontFamily: 'Inter_600SemiBold',
+                    fontFamily: 'Poppins_600SemiBold',
                     fontSize: 18,
                 },
                 headerShadowVisible: false,
