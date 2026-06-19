@@ -1,3 +1,4 @@
+import { refreshSettlementSuggestions } from '@/services/api/settlements';
 import { db } from '@/services/firebase/config';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
@@ -159,7 +160,7 @@ export default function ExpenseDetailsScreen() {
                         try {
                             const expenseRef = doc(db, 'groups', groupId, 'expenses', expenseId);
                             await deleteDoc(expenseRef);
-                            
+
                             // Update group total expenses
                             const groupRef = doc(db, 'groups', groupId);
                             const groupSnap = await getDoc(groupRef);
@@ -168,7 +169,8 @@ export default function ExpenseDetailsScreen() {
                                 const newTotal = (groupData.totalExpenses || 0) - (expense?.amount || 0);
                                 await updateDoc(groupRef, { totalExpenses: newTotal });
                             }
-                            
+
+                            await refreshSettlementSuggestions(groupId);
                             Alert.alert('Success', 'Expense deleted successfully');
                             router.back();
                         } catch (error) {

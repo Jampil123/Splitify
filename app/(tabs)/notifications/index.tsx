@@ -1,6 +1,6 @@
 import { useNotifications } from '@/services/hooks/useNotifications';
 import { useAuthStore } from '@/stores/authStore';
-import { colors, spacing, typographyStyles } from '@/styles';
+import { colors, spacing } from '@/styles';
 import { formatRelativeTime } from '@/utils/dateHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -18,132 +18,75 @@ import {
     View,
 } from 'react-native';
 
-// Notification Type Icons
-const getNotificationIcon = (type: string): string => {
-    const iconMap: Record<string, string> = {
-        expense_added: 'receipt-outline',
-        expense_updated: 'create-outline',
-        expense_deleted: 'trash-outline',
-        settlement_reminder: 'time-outline',
-        payment_confirmed: 'checkmark-circle-outline',
-        friend_request: 'person-add-outline',
-        friend_request_accepted: 'person-add-outline',
-        member_joined: 'people-outline',
-        member_left: 'person-remove-outline',
-        group_invite: 'mail-outline',
-        payment_request: 'cash-outline',
-    };
-    return iconMap[type] || 'notifications-outline';
+const TYPE_ICON: Record<string, string> = {
+    expense_added: 'receipt-outline',
+    expense_updated: 'create-outline',
+    expense_deleted: 'trash-outline',
+    settlement_reminder: 'time-outline',
+    payment_confirmed: 'checkmark-circle-outline',
+    friend_request: 'person-add-outline',
+    friend_request_accepted: 'people-outline',
+    member_joined: 'people-outline',
+    member_left: 'person-remove-outline',
+    group_invite: 'mail-outline',
+    payment_request: 'cash-outline',
 };
 
-const getNotificationColor = (type: string): string => {
-    if (type.includes('expense')) return colors.primary;
-    if (type.includes('settlement') || type.includes('payment')) return '#4CAF50';
-    if (type.includes('friend')) return colors.secondary;
-    if (type.includes('reminder')) return '#F59E0B';
-    return colors.primary;
+const TYPE_COLOR: Record<string, string> = {
+    expense_added: colors.primary,
+    expense_updated: colors.primary,
+    expense_deleted: colors.error,
+    settlement_reminder: '#F59E0B',
+    payment_confirmed: '#10B981',
+    friend_request: colors.secondary,
+    friend_request_accepted: '#10B981',
+    member_joined: colors.primary,
+    member_left: colors.error,
+    group_invite: colors.secondary,
+    payment_request: '#10B981',
 };
 
-// Notification Item Component
-interface NotificationItemProps {
-    id: string;
-    title: string;
-    body: string;
-    type: string;
-    createdAt: any;
-    isRead: boolean;
-    onPress: () => void;
-}
+const FILTERS = [
+    { id: 'all', label: 'All', types: null as string[] | null },
+    { id: 'expense', label: 'Expenses', types: ['expense_added', 'expense_updated', 'expense_deleted'] },
+    { id: 'payment', label: 'Payments', types: ['settlement_reminder', 'payment_confirmed', 'payment_request'] },
+    { id: 'friend', label: 'Friends', types: ['friend_request', 'friend_request_accepted'] },
+    { id: 'group', label: 'Groups', types: ['member_joined', 'member_left', 'group_invite'] },
+];
 
-function NotificationItem({ id, title, body, type, createdAt, isRead, onPress }: NotificationItemProps) {
-    const timeAgo = formatRelativeTime(createdAt?.toDate?.() || new Date());
-    const iconName = getNotificationIcon(type);
-    const iconColor = getNotificationColor(type);
+function NotifItem({ notification, onPress }: { notification: any; onPress: () => void }) {
+    const icon = TYPE_ICON[notification.type] || 'notifications-outline';
+    const color = TYPE_COLOR[notification.type] || colors.primary;
+    const time = formatRelativeTime(notification.createdAt?.toDate?.() || new Date());
 
     return (
         <TouchableOpacity
-            style={[styles.notificationItem, !isRead && styles.unreadItem]}
+            style={[s.item, !notification.isRead && s.itemUnread]}
             onPress={onPress}
             activeOpacity={0.7}
         >
-            {!isRead && <View style={styles.unreadDot} />}
-            <View style={[styles.iconContainer, { backgroundColor: iconColor + '15' }]}>
-                <Ionicons name={iconName as any} size={24} color={iconColor} />
+            <View style={[s.itemIcon, { backgroundColor: color + '18' }]}>
+                <Ionicons name={icon as any} size={20} color={color} />
             </View>
-            <View style={styles.contentContainer}>
-                <View style={styles.headerRow}>
-                    <Text style={[typographyStyles.titleMedium, styles.title]} numberOfLines={1}>
-                        {title}
-                    </Text>
-                    <Text style={[typographyStyles.bodySmall, styles.time]}>{timeAgo}</Text>
+            <View style={s.itemContent}>
+                <View style={s.itemTop}>
+                    <Text style={s.itemTitle} numberOfLines={1}>{notification.title}</Text>
+                    <Text style={s.itemTime}>{time}</Text>
                 </View>
-                <Text style={[typographyStyles.bodySmall, styles.body]} numberOfLines={2}>
-                    {body}
-                </Text>
+                <Text style={s.itemBody} numberOfLines={2}>{notification.body}</Text>
             </View>
+            {!notification.isRead && <View style={s.dot} />}
         </TouchableOpacity>
-    );
-}
-
-// Filter Chip Component
-interface FilterChipProps {
-    label: string;
-    isActive: boolean;
-    onPress: () => void;
-}
-
-function FilterChip({ label, isActive, onPress }: FilterChipProps) {
-    return (
-        <TouchableOpacity
-            style={[styles.filterChip, isActive && styles.filterChipActive]}
-            onPress={onPress}
-        >
-            <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
-                {label}
-            </Text>
-        </TouchableOpacity>
-    );
-}
-
-// Empty State Component
-function EmptyState() {
-    return (
-        <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconContainer}>
-                <Ionicons name="notifications-off-outline" size={48} color={colors.outline} />
-            </View>
-            <Text style={[typographyStyles.headlineSmall, styles.emptyTitle]}>
-                All Caught Up!
-            </Text>
-            <Text style={[typographyStyles.bodyMedium, styles.emptyText]}>
-                No notifications to show right now
-            </Text>
-        </View>
     );
 }
 
 export default function NotificationsScreen() {
     const router = useRouter();
     const { user } = useAuthStore();
-    const {
-        notifications,
-        unreadCount,
-        isLoading,
-        fetchNotifications,
-        markAsRead,
-        markAllAsRead,
-    } = useNotifications(user?.id);
+    const { notifications, unreadCount, isLoading, fetchNotifications, markAllAsRead } = useNotifications(user?.id);
 
     const [refreshing, setRefreshing] = useState(false);
-    const [selectedFilter, setSelectedFilter] = useState('all');
-
-    const filters = [
-        { id: 'all', label: 'All' },
-        { id: 'expense', label: 'Expenses' },
-        { id: 'settlement', label: 'Settlements' },
-        { id: 'friend', label: 'Friends' },
-        { id: 'reminder', label: 'Reminders' },
-    ];
+    const [filter, setFilter] = useState('all');
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
@@ -151,383 +94,221 @@ export default function NotificationsScreen() {
         setRefreshing(false);
     }, [fetchNotifications]);
 
-    const handleMarkAllRead = async () => {
+    const handleMarkAll = () => {
         if (unreadCount === 0) return;
-        
-        Alert.alert(
-            'Mark All as Read',
-            'Are you sure you want to mark all notifications as read?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Mark All',
-                    onPress: async () => {
-                        await markAllAsRead();
-                    },
-                },
-            ]
-        );
+        Alert.alert('Mark All as Read', 'Mark all notifications as read?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Mark All', onPress: markAllAsRead },
+        ]);
     };
 
-    const handleNotificationPress = async (notification: any) => {
-        // Mark as read if not already
-        if (!notification.isRead) {
-            await markAsRead(notification.id);
-        }
-
-        // Navigate based on notification type
-        switch (notification.type) {
-            case 'expense_added':
-            case 'expense_updated':
-            case 'expense_deleted':
-                if (notification.groupId) {
-                    // router.push(`/groups/${notification.groupId}/expenses`);
-                }
-                break;
-            case 'settlement_reminder':
-            case 'payment_confirmed':
-                if (notification.groupId) {
-                    // router.push(`/groups/${notification.groupId}/settlements`);
-                }
-                break;
-            case 'friend_request':
-            case 'friend_request_accepted':
-                router.push('/(tabs)/friends');
-                break;
-            case 'member_joined':
-            case 'member_left':
-            case 'group_invite':
-                if (notification.groupId) {
-                    // router.push(`/groups/${notification.groupId}`);
-                }
-                break;
-            default:
-                // Just mark as read
-                break;
-        }
+    const getFiltered = () => {
+        const f = FILTERS.find(f => f.id === filter);
+        if (!f || !f.types) return notifications;
+        return notifications.filter(n => f.types!.includes(n.type));
     };
 
-    const getFilteredNotifications = () => {
-        if (selectedFilter === 'all') return notifications;
-        
-        const filterMap: Record<string, string[]> = {
-            expense: ['expense_added', 'expense_updated', 'expense_deleted'],
-            settlement: ['settlement_reminder', 'payment_confirmed', 'payment_request'],
-            friend: ['friend_request', 'friend_request_accepted'],
-            reminder: ['member_joined', 'group_invite'],
-        };
-        
-        const allowedTypes = filterMap[selectedFilter] || [];
-        return notifications.filter(n => allowedTypes.includes(n.type));
-    };
-
-    const groupNotificationsByDate = (notifs: any[]) => {
-        const groups: { title: string; data: any[] }[] = [];
-        const today: any[] = [];
-        const yesterday: any[] = [];
-        const earlier: any[] = [];
-
+    const groupByDate = (items: any[]) => {
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const yesterdayStart = new Date(todayStart);
-        yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+        const yestStart = new Date(todayStart);
+        yestStart.setDate(yestStart.getDate() - 1);
 
-        notifs.forEach(notification => {
-            const date = notification.createdAt?.toDate?.() || new Date();
-            if (date >= todayStart) {
-                today.push(notification);
-            } else if (date >= yesterdayStart) {
-                yesterday.push(notification);
-            } else {
-                earlier.push(notification);
-            }
+        const today: any[] = [], yesterday: any[] = [], earlier: any[] = [];
+        items.forEach(n => {
+            const d = n.createdAt?.toDate?.() || new Date();
+            if (d >= todayStart) today.push(n);
+            else if (d >= yestStart) yesterday.push(n);
+            else earlier.push(n);
         });
 
-        if (today.length > 0) groups.push({ title: 'Today', data: today });
-        if (yesterday.length > 0) groups.push({ title: 'Yesterday', data: yesterday });
-        if (earlier.length > 0) groups.push({ title: 'Earlier', data: earlier });
-
-        return groups;
+        const result: { title: string; data: any[] }[] = [];
+        if (today.length) result.push({ title: 'Today', data: today });
+        if (yesterday.length) result.push({ title: 'Yesterday', data: yesterday });
+        if (earlier.length) result.push({ title: 'Earlier', data: earlier });
+        return result;
     };
 
-    const filteredNotifications = getFilteredNotifications();
-    const groupedNotifications = groupNotificationsByDate(filteredNotifications);
+    const grouped = groupByDate(getFiltered());
 
     if (isLoading && !refreshing) {
         return (
-            <View style={styles.loadingContainer}>
+            <View style={s.centered}>
                 <ActivityIndicator size="large" color={colors.primary} />
             </View>
         );
     }
 
     return (
-        <View style={styles.container}>
+        <View style={s.container}>
             <StatusBar style="dark" />
-            
-            {/* Header */}
-            <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    <View style={styles.headerAvatar}>
-                        <Ionicons name="person" size={20} color={colors.onPrimary} />
-                    </View>
-                    <Text style={[typographyStyles.headlineMedium, styles.headerTitle]}>
-                        Notifications
-                    </Text>
-                </View>
-                <TouchableOpacity style={styles.settingsButton}>
-                    <Ionicons name="settings-outline" size={24} color={colors.primary} />
-                </TouchableOpacity>
-            </View>
 
-            {/* Title Bar */}
-            <View style={styles.titleBar}>
-                <Text style={[typographyStyles.headlineMedium, styles.title]}>
-                    Notifications
-                </Text>
+            {/* Header */}
+            <View style={s.header}>
+                <View style={s.headerLeft}>
+                    <Text style={s.headerTitle}>Notifications</Text>
+                    {unreadCount > 0 && (
+                        <View style={s.badge}>
+                            <Text style={s.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                        </View>
+                    )}
+                </View>
                 {unreadCount > 0 && (
-                    <TouchableOpacity onPress={handleMarkAllRead}>
-                        <Text style={[typographyStyles.labelMedium, styles.markAllText]}>
-                            Mark all read
-                        </Text>
+                    <TouchableOpacity onPress={handleMarkAll}>
+                        <Text style={s.markAll}>Mark all read</Text>
                     </TouchableOpacity>
                 )}
             </View>
 
-            {/* Filter Chips */}
+            {/* Filter chips */}
             <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.filtersContainer}
+                contentContainerStyle={s.filters}
             >
-                {filters.map(filter => (
-                    <FilterChip
-                        key={filter.id}
-                        label={filter.label}
-                        isActive={selectedFilter === filter.id}
-                        onPress={() => setSelectedFilter(filter.id)}
-                    />
+                {FILTERS.map(f => (
+                    <TouchableOpacity
+                        key={f.id}
+                        style={[s.chip, filter === f.id && s.chipActive]}
+                        onPress={() => setFilter(f.id)}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={[s.chipText, filter === f.id && s.chipTextActive]}>
+                            {f.label}
+                        </Text>
+                    </TouchableOpacity>
                 ))}
             </ScrollView>
 
-            {/* Notifications List */}
-            {filteredNotifications.length > 0 ? (
-                <FlatList
-                    data={groupedNotifications}
-                    keyExtractor={(item, index) => item.title + index}
-                    renderItem={({ item: group }) => (
-                        <View style={styles.groupContainer}>
-                            <Text style={[typographyStyles.labelMedium, styles.groupTitle]}>
-                                {group.title}
-                            </Text>
-                            {group.data.map((notification: any) => (
-                                <NotificationItem
-                                    key={notification.id}
-                                    id={notification.id}
-                                    title={notification.title}
-                                    body={notification.body}
-                                    type={notification.type}
-                                    createdAt={notification.createdAt}
-                                    isRead={notification.isRead}
-                                    onPress={() => handleNotificationPress(notification)}
-                                />
-                            ))}
+            {/* List */}
+            <FlatList
+                data={grouped}
+                keyExtractor={(item, i) => item.title + i}
+                renderItem={({ item: section }) => (
+                    <View>
+                        <Text style={s.sectionTitle}>{section.title}</Text>
+                        {section.data.map((n: any) => (
+                            <NotifItem
+                                key={n.id}
+                                notification={n}
+                                onPress={() =>
+                                    router.push({
+                                        pathname: '/notifications/[notificationId]',
+                                        params: { notificationId: n.id },
+                                    })
+                                }
+                            />
+                        ))}
+                    </View>
+                )}
+                ListEmptyComponent={
+                    <View style={s.empty}>
+                        <View style={s.emptyIcon}>
+                            <Ionicons name="notifications-off-outline" size={40} color={colors.outline} />
                         </View>
-                    )}
-                    contentContainerStyle={styles.listContent}
-                    refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
-                    }
-                    showsVerticalScrollIndicator={false}
-                />
-            ) : (
-                <FlatList
-                    data={[]}
-                    renderItem={() => null}
-                    ListEmptyComponent={EmptyState}
-                    contentContainerStyle={styles.listContent}
-                    refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
-                    }
-                    showsVerticalScrollIndicator={false}
-                />
-            )}
+                        <Text style={s.emptyTitle}>All caught up!</Text>
+                        <Text style={s.emptyText}>No notifications to show</Text>
+                    </View>
+                }
+                contentContainerStyle={s.listContent}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
+                }
+                showsVerticalScrollIndicator={false}
+            />
         </View>
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: colors.background,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: colors.background,
-    },
+const s = StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     // Header
     header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
         paddingHorizontal: spacing.gutter,
-        paddingTop: spacing.md,
-        paddingBottom: spacing.sm,
-        backgroundColor: colors.surface + 'CC',
+        paddingTop: spacing.lg, paddingBottom: spacing.md,
+        backgroundColor: colors.surface,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.outlineVariant + '50',
     },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-    },
-    headerAvatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: colors.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
+    headerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     headerTitle: {
-        color: colors.primary,
-        fontSize: 18,
+        fontSize: 20, fontWeight: '700', color: colors.primary, fontFamily: 'Inter_700Bold',
     },
-    settingsButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
+    badge: {
+        backgroundColor: colors.error, borderRadius: 10,
+        paddingHorizontal: 6, paddingVertical: 1,
+        minWidth: 20, alignItems: 'center',
     },
-    // Title Bar
-    titleBar: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'baseline',
-        paddingHorizontal: spacing.gutter,
-        marginTop: spacing.md,
-        marginBottom: spacing.md,
-    },
-    title: {
-        color: '#2A3E4B',
-        fontSize: 22,
-    },
-    markAllText: {
-        color: colors.primary,
+    badgeText: { fontSize: 11, fontWeight: '700', color: colors.onPrimary, fontFamily: 'Inter_700Bold' },
+    markAll: {
+        fontSize: 13, color: colors.primary, fontFamily: 'Inter_500Medium',
     },
     // Filters
-    filtersContainer: {
+    filters: {
         paddingHorizontal: spacing.gutter,
-        paddingBottom: spacing.md,
+        paddingTop: spacing.sm, paddingBottom: spacing.sm,
         gap: spacing.sm,
     },
-    filterChip: {
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.sm,
-        borderRadius: spacing.borderRadiusFull,
-        backgroundColor: colors.secondaryContainer,
+    chip: {
+        height: 32, paddingHorizontal: 14, borderRadius: 16,
+        backgroundColor: colors.surfaceContainerHigh,
+        justifyContent: 'center', alignItems: 'center',
     },
-    filterChipActive: {
-        backgroundColor: colors.primary,
+    chipActive: { backgroundColor: colors.primary },
+    chipText: { fontSize: 12, fontWeight: '500', color: colors.onSurfaceVariant, fontFamily: 'Inter_500Medium' },
+    chipTextActive: { color: colors.onPrimary },
+    // Sections
+    sectionTitle: {
+        fontSize: 11, fontWeight: '600', color: colors.onSurfaceVariant,
+        paddingHorizontal: spacing.gutter, paddingTop: spacing.md, paddingBottom: spacing.sm,
+        fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.8,
     },
-    filterChipText: {
-        fontSize: 12,
-        fontWeight: '500',
-        color: colors.secondaryContainer,
+    // Items
+    item: {
+        flexDirection: 'row', alignItems: 'flex-start',
+        paddingHorizontal: spacing.gutter, paddingVertical: 12,
+        gap: spacing.md, backgroundColor: colors.surface,
+        borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.outlineVariant + '30',
     },
-    filterChipTextActive: {
-        color: colors.onPrimary,
+    itemUnread: { backgroundColor: colors.primaryFixed + '25' },
+    itemIcon: {
+        width: 40, height: 40, borderRadius: 20,
+        alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
+    },
+    itemContent: { flex: 1 },
+    itemTop: {
+        flexDirection: 'row', justifyContent: 'space-between',
+        alignItems: 'flex-start', gap: spacing.sm, marginBottom: 2,
+    },
+    itemTitle: {
+        fontSize: 14, fontWeight: '600', color: colors.onSurface,
+        fontFamily: 'Inter_600SemiBold', flex: 1,
+    },
+    itemTime: {
+        fontSize: 11, color: colors.outline, fontFamily: 'Inter_400Regular', flexShrink: 0, marginTop: 1,
+    },
+    itemBody: {
+        fontSize: 13, color: colors.onSurfaceVariant, lineHeight: 18,
+        fontFamily: 'Inter_400Regular',
+    },
+    dot: {
+        width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary,
+        marginTop: 6, flexShrink: 0,
     },
     // List
-    listContent: {
-        paddingBottom: 80,
-    },
-    groupContainer: {
-        marginBottom: spacing.lg,
-    },
-    groupTitle: {
-        color: colors.onSurfaceVariant,
-        marginBottom: spacing.sm,
-        marginHorizontal: spacing.gutter,
-    },
-    // Notification Item
-    notificationItem: {
-        flexDirection: 'row',
-        backgroundColor: colors.secondaryFixed + '30',
-        borderRadius: spacing.borderRadiusLg,
-        padding: spacing.md,
-        marginHorizontal: spacing.gutter,
-        marginBottom: spacing.md,
-        gap: spacing.md,
-        position: 'relative',
-    },
-    unreadItem: {
-        backgroundColor: colors.secondaryFixed + '50',
-    },
-    unreadDot: {
-        position: 'absolute',
-        right: spacing.md,
-        top: spacing.md,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: colors.primary,
-    },
-    iconContainer: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-    },
-    contentContainer: {
-        flex: 1,
-    },
-    headerRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: 4,
-    },
-    notificationTitle: {
-        color: colors.onSurface,
-        fontSize: 14,
-        flex: 1,
-    },
-    time: {
-        color: colors.onSurfaceVariant,
-        marginLeft: spacing.sm,
-    },
-    body: {
-        color: colors.onSurfaceVariant,
-        lineHeight: 20,
-    },
-    // Empty State
-    emptyContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: spacing.xxl * 2,
-        paddingHorizontal: spacing.xl,
-    },
-    emptyIconContainer: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-        backgroundColor: colors.surfaceContainerHighest,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: spacing.lg,
+    listContent: { paddingBottom: 80 },
+    // Empty
+    empty: { alignItems: 'center', paddingVertical: 60, gap: spacing.sm },
+    emptyIcon: {
+        width: 80, height: 80, borderRadius: 40, backgroundColor: colors.surfaceContainerHighest,
+        alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm,
     },
     emptyTitle: {
-        color: colors.onSurface,
-        marginBottom: spacing.sm,
-        textAlign: 'center',
+        fontSize: 17, fontWeight: '700', color: colors.onSurface, fontFamily: 'Inter_700Bold',
     },
     emptyText: {
-        color: colors.onSurfaceVariant,
-        textAlign: 'center',
+        fontSize: 13, color: colors.onSurfaceVariant, fontFamily: 'Inter_400Regular',
     },
 });

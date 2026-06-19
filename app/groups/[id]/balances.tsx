@@ -1,15 +1,14 @@
 import { db } from '@/services/firebase/config';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
-import { Group, UserBalance } from '@/types';
+import { Group, Settlement, UserBalance } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { doc, getDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -18,100 +17,68 @@ import {
     View,
 } from 'react-native';
 
-// Member Balance Card Component
-function MemberBalanceCard({ 
-    member, 
-    isCurrentUser,
-    onPress,
-}: { 
-    member: UserBalance; 
-    isCurrentUser: boolean;
-    onPress?: () => void;
-}) {
-    const isOwed = member.balance > 0;
-    const isOwes = member.balance < 0;
-    const isSettled = member.balance === 0;
-    
-    const statusText = isSettled ? 'SETTLED' : (isOwed ? 'GETS BACK' : 'OWES');
-    const statusColor = isSettled ? colors.outline : (isOwed ? colors.primary : colors.error);
-    const amountColor = isSettled ? colors.outline : (isOwed ? colors.primary : colors.error);
-
-    const getInitials = (name: string) => {
-        return name.charAt(0).toUpperCase();
-    };
+function MemberRow({ member, isCurrentUser }: { member: UserBalance; isCurrentUser: boolean }) {
+    const isPositive = member.balance > 0;
+    const isNegative = member.balance < 0;
+    const sign = isPositive ? '+' : isNegative ? '−' : '';
+    const amountColor = isPositive ? '#10B981' : isNegative ? colors.error : colors.outline;
+    const label = isPositive ? 'gets back' : isNegative ? 'owes' : 'settled';
 
     return (
-        <TouchableOpacity 
-            style={styles.memberCard}
-            onPress={onPress}
-            activeOpacity={0.7}
-        >
-            <View style={styles.memberLeft}>
-                <View style={[styles.memberAvatar, isCurrentUser && styles.currentUserAvatar]}>
-                    <Text style={styles.memberAvatarText}>{getInitials(member.userName)}</Text>
-                </View>
-                <View>
-                    <Text style={[typographyStyles.bodyMedium, styles.memberName]}>
-                        {member.userName} {isCurrentUser && '(You)'}
-                    </Text>
-                    <Text style={[typographyStyles.bodySmall, styles.memberDetails]}>
-                        Paid: ₱{member.totalPaid.toFixed(2)} • Share: ₱{member.totalShare.toFixed(2)}
-                    </Text>
-                </View>
+        <View style={s.memberRow}>
+            <View style={[s.avatar, isCurrentUser && s.avatarYou]}>
+                <Text style={s.avatarText}>{member.userName.charAt(0).toUpperCase()}</Text>
             </View>
-            <View style={styles.memberRight}>
-                <Text style={[typographyStyles.labelMedium, styles.statusText, { color: statusColor }]}>
-                    {statusText}
+            <View style={s.memberInfo}>
+                <Text style={s.memberName} numberOfLines={1}>
+                    {member.userName}{isCurrentUser ? ' (You)' : ''}
                 </Text>
-                <Text style={[typographyStyles.bodyLarge, styles.amountText, { color: amountColor }]}>
-                    ₱{Math.abs(member.balance).toFixed(2)}
-                </Text>
+                <Text style={s.memberLabel}>{label}</Text>
             </View>
-        </TouchableOpacity>
+            <Text style={[s.memberAmount, { color: amountColor }]}>
+                {sign}₱{Math.abs(member.balance).toFixed(2)}
+            </Text>
+        </View>
     );
 }
 
-// Payment Card Component (Detailed View)
-function PaymentCard({
-    fromUser,
-    toUser,
+function PaymentRow({
+    name,
     amount,
     type,
-    onAction,
+    onPress,
 }: {
-    fromUser: string;
-    toUser: string;
+    name: string;
     amount: number;
     type: 'owe' | 'receive';
-    onAction?: () => void;
+    onPress: () => void;
 }) {
     const isOwe = type === 'owe';
-    const iconColor = isOwe ? colors.error : colors.primary;
-    const bgColor = isOwe ? colors.errorContainer : colors.primaryFixed;
+    const amountColor = isOwe ? colors.error : '#10B981';
+    const rowBg = isOwe ? colors.errorContainer + '40' : colors.primaryFixed + '70';
 
     return (
-        <View style={styles.paymentCard}>
-            <View style={styles.paymentLeft}>
-                <View style={[styles.paymentIcon, { backgroundColor: bgColor }]}>
-                    <Ionicons name="person-outline" size={20} color={iconColor} />
-                </View>
-                <View>
-                    <Text style={[typographyStyles.bodySmall, styles.paymentText]}>
-                        {isOwe ? 'You owe' : ''} <Text style={styles.paymentName}>{toUser}</Text>
-                    </Text>
-                    <Text style={[typographyStyles.headlineMedium, styles.paymentAmount, { color: iconColor }]}>
-                        ₱{amount.toFixed(2)}
-                    </Text>
-                </View>
+        <View style={[s.payRow, { backgroundColor: rowBg }]}>
+            <View style={[s.avatar, { backgroundColor: isOwe ? colors.errorContainer : colors.primaryContainer }]}>
+                <Text style={s.avatarText}>{name.charAt(0).toUpperCase()}</Text>
             </View>
-            <TouchableOpacity 
-                style={[styles.paymentButton, isOwe ? styles.payButton : styles.requestButton]}
-                onPress={onAction}
-            >
-                <Text style={[typographyStyles.labelMedium, styles.paymentButtonText]}>
-                    {isOwe ? 'Pay Now' : 'Request Payment'}
+            <View style={s.payInfo}>
+                <Text style={s.payLabel}>{isOwe ? 'You owe' : 'Owes you'}</Text>
+                <Text style={s.payName} numberOfLines={1}>{name}</Text>
+            </View>
+            <View style={s.payRight}>
+                <Text style={[s.payAmount, { color: amountColor }]}>
+                    {isOwe ? '−' : '+'}₱{amount.toFixed(2)}
                 </Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                    style={[s.payBtn, isOwe ? s.payBtnRed : s.payBtnGreen]}
+                    onPress={onPress}
+                >
+                    <Text style={[s.payBtnText, !isOwe && s.payBtnTextGreen]}>
+                        {isOwe ? 'Pay' : 'Request'}
+                    </Text>
+                </TouchableOpacity>
+            </View>
         </View>
     );
 }
@@ -120,591 +87,302 @@ export default function BalancesScreen() {
     const router = useRouter();
     const { id: groupId } = useLocalSearchParams<{ id: string }>();
     const { user } = useAuthStore();
-    
-    const [group, setGroup] = useState<Group | null>(null);
+
+    const [settlements, setSettlements] = useState<Settlement[]>([]);
     const [balances, setBalances] = useState<UserBalance[]>([]);
     const [userBalance, setUserBalance] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [activeTab, setActiveTab] = useState<'summary' | 'detailed'>('summary');
+    const [activeTab, setActiveTab] = useState<'members' | 'mine'>('members');
     const [totalExpenses, setTotalExpenses] = useState(0);
     const [individualShare, setIndividualShare] = useState(0);
 
     const fetchBalances = useCallback(async () => {
         if (!groupId) return;
-        
         try {
-            const groupRef = doc(db, 'groups', groupId);
-            const groupSnap = await getDoc(groupRef);
-            
-            if (groupSnap.exists()) {
-                const groupData = { id: groupSnap.id, ...groupSnap.data() } as Group;
-                setGroup(groupData);
-                setTotalExpenses(groupData.totalExpenses || 0);
-                
-                // Calculate balances
-                const memberCount = groupData.members.length;
-                const share = memberCount > 0 ? (groupData.totalExpenses || 0) / memberCount : 0;
-                setIndividualShare(share);
-                
-                const userBalances: UserBalance[] = groupData.members.map(member => ({
-                    userId: member.userId,
-                    userName: member.fullName,
-                    totalPaid: member.totalPaid || 0,
-                    totalShare: share,
-                    balance: (member.totalPaid || 0) - share,
-                }));
-                
-                setBalances(userBalances);
-                
-                // Find current user's balance
-                const currentUserBalance = userBalances.find(b => b.userId === user?.id);
-                setUserBalance(currentUserBalance?.balance || 0);
-            } else {
-                Alert.alert('Error', 'Group not found');
-                router.back();
-            }
-        } catch (error) {
-            console.error('Error fetching balances:', error);
-            Alert.alert('Error', 'Failed to load balances');
+            const groupSnap = await getDoc(doc(db, 'groups', groupId));
+            if (!groupSnap.exists()) return;
+
+            const groupData = { id: groupSnap.id, ...groupSnap.data() } as Group;
+            setTotalExpenses(groupData.totalExpenses || 0);
+
+            const memberCount = groupData.members.length;
+            const share = memberCount > 0 ? (groupData.totalExpenses || 0) / memberCount : 0;
+            setIndividualShare(share);
+
+            const userBalances: UserBalance[] = groupData.members.map(m => ({
+                userId: m.userId,
+                userName: m.fullName,
+                totalPaid: m.totalPaid || 0,
+                totalShare: share,
+                balance: (m.totalPaid || 0) - share,
+            }));
+            setBalances(userBalances);
+            setUserBalance(userBalances.find(b => b.userId === user?.id)?.balance || 0);
+
+            const settlementsSnap = await getDocs(query(
+                collection(db, 'groups', groupId, 'settlements'),
+                where('status', '==', 'pending')
+            ));
+            setSettlements(settlementsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Settlement));
+        } catch (e) {
+            console.error('Error fetching balances:', e);
         } finally {
             setIsLoading(false);
             setRefreshing(false);
         }
     }, [groupId, user]);
 
-    useEffect(() => {
-        fetchBalances();
-    }, [fetchBalances]);
+    useEffect(() => { fetchBalances(); }, [fetchBalances]);
 
-    const onRefresh = () => {
-        setRefreshing(true);
-        fetchBalances();
-    };
+    const onRefresh = () => { setRefreshing(true); fetchBalances(); };
+    const goToSettlements = () => router.push({ pathname: '/groups/[id]/settlements', params: { id: groupId } });
 
-    const handleViewSettlements = () => {
-        router.push({
-            pathname: '/groups/[id]/settlements',
-            params: { id: groupId }
-        });
-    };
-
-    const handleExportBalances = () => {
-        Alert.alert('Export', 'Export balances feature coming soon');
-    };
-
-    const handlePayNow = (toUser: string, amount: number) => {
-        Alert.alert(
-            'Pay Now',
-            `Pay ₱${amount.toFixed(2)} to ${toUser}?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Pay', onPress: () => {
-                    Alert.alert('Success', 'Payment request sent!');
-                }}
-            ]
-        );
-    };
-
-    const handleRequestPayment = (fromUser: string, amount: number) => {
-        Alert.alert(
-            'Request Payment',
-            `Request ₱${amount.toFixed(2)} from ${fromUser}?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Request', onPress: () => {
-                    Alert.alert('Success', 'Payment request sent!');
-                }}
-            ]
-        );
-    };
+    const oweList = settlements.filter(s => s.fromUserId === user?.id);
+    const receiveList = settlements.filter(s => s.toUserId === user?.id);
 
     const isOwed = userBalance > 0;
-    const isOwes = userBalance < 0;
     const isSettled = userBalance === 0;
-    
-    const balanceText = isSettled ? 'Settled' : (isOwed ? 'You Get Back' : 'You Owe');
-    const balanceColor = isSettled ? colors.outline : (isOwed ? colors.primary : colors.error);
-    const balanceBg = isSettled ? colors.surfaceContainer : (isOwed ? '#E8F5E9' : '#FEE2E2');
-
-    // Get owe and receive lists for detailed view
-    const oweList = balances
-        .filter(b => b.balance < 0 && b.userId !== user?.id)
-        .map(b => ({
-            fromUser: b.userName,
-            toUser: user?.fullName || 'You',
-            amount: Math.abs(b.balance),
-        }));
-
-    const receiveList = balances
-        .filter(b => b.balance > 0 && b.userId !== user?.id)
-        .map(b => ({
-            fromUser: user?.fullName || 'You',
-            toUser: b.userName,
-            amount: b.balance,
-        }));
+    const sign = isOwed ? '+' : isSettled ? '' : '−';
+    const balanceColor = isSettled ? colors.outline : isOwed ? '#10B981' : colors.error;
+    const heroBg = isSettled ? colors.surfaceContainerLow : isOwed ? '#E8F5E9' : '#FEE2E2';
 
     if (isLoading) {
         return (
-            <View style={styles.loadingContainer}>
+            <View style={s.centered}>
                 <ActivityIndicator size="large" color={colors.primary} />
             </View>
         );
     }
 
     return (
-        <View style={styles.container}>
+        <View style={s.container}>
             <StatusBar style="dark" />
-            
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+
+            <View style={s.header}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
                     <Ionicons name="arrow-back-outline" size={24} color={colors.primary} />
                 </TouchableOpacity>
-                <Text style={[typographyStyles.headlineMedium, styles.headerTitle]}>
-                    Balances
-                </Text>
-                <TouchableOpacity style={styles.shareButton}>
-                    <Ionicons name="share-outline" size={24} color={colors.primary} />
-                </TouchableOpacity>
+                <Text style={[typographyStyles.headlineMedium, s.headerTitle]}>Balances</Text>
+                <View style={{ width: 40 }} />
             </View>
 
             <ScrollView
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
-                }
+                contentContainerStyle={s.scroll}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />}
             >
-                {/* Summary Card */}
-                <View style={styles.summaryCard}>
-                    <Text style={[typographyStyles.labelMedium, styles.summaryLabel]}>Group Snapshot</Text>
-                    <Text style={styles.summaryTotal}>Total Expenses: ₱{totalExpenses.toFixed(2)}</Text>
-                    <View style={styles.summaryDivider} />
-                    <Text style={styles.summaryShare}>Each person pays: ₱{individualShare.toFixed(2)}</Text>
-                </View>
-
-                {/* Personal Balance Card */}
-                <View style={[styles.personalCard, { backgroundColor: balanceBg }]}>
-                    <View>
-                        <Text style={[typographyStyles.labelMedium, styles.personalLabel, { color: balanceColor }]}>
-                            {balanceText}
-                        </Text>
-                        <Text style={[typographyStyles.headlineMedium, styles.personalAmount, { color: balanceColor }]}>
-                            ₱{Math.abs(userBalance).toFixed(2)}
-                        </Text>
-                    </View>
-                    {!isSettled && (
-                        <View style={styles.personalBadge}>
-                            <Text style={[typographyStyles.labelMedium, styles.personalBadgeText, { color: balanceColor }]}>
-                                {isOwed ? 'From ' : 'To '}
-                                {isOwed ? receiveList.length : oweList.length} person{isOwed ? receiveList.length !== 1 ? 's' : '' : oweList.length !== 1 ? 's' : ''}
-                            </Text>
+                {/* Hero balance */}
+                <View style={[s.hero, { backgroundColor: heroBg }]}>
+                    <Text style={s.heroLabel}>YOUR BALANCE</Text>
+                    <Text style={[s.heroAmount, { color: balanceColor }]}>
+                        {sign}₱{Math.abs(userBalance).toFixed(2)}
+                    </Text>
+                    <Text style={[s.heroStatus, { color: balanceColor }]}>
+                        {isSettled ? 'All settled up' : isOwed ? 'You are owed' : 'You owe'}
+                    </Text>
+                    <View style={s.heroStats}>
+                        <View style={s.heroStat}>
+                            <Text style={s.heroStatLabel}>Group Total</Text>
+                            <Text style={s.heroStatValue}>₱{totalExpenses.toFixed(2)}</Text>
                         </View>
-                    )}
+                        <View style={s.heroStatDivider} />
+                        <View style={s.heroStat}>
+                            <Text style={s.heroStatLabel}>Per Person</Text>
+                            <Text style={s.heroStatValue}>₱{individualShare.toFixed(2)}</Text>
+                        </View>
+                    </View>
                 </View>
 
-                {/* Tab Toggle */}
-                <View style={styles.tabContainer}>
-                    <TouchableOpacity
-                        style={[styles.tab, activeTab === 'summary' && styles.tabActive]}
-                        onPress={() => setActiveTab('summary')}
-                    >
-                        <Text style={[typographyStyles.labelMedium, styles.tabText, activeTab === 'summary' && styles.tabTextActive]}>
-                            Summary View
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.tab, activeTab === 'detailed' && styles.tabActive]}
-                        onPress={() => setActiveTab('detailed')}
-                    >
-                        <Text style={[typographyStyles.labelMedium, styles.tabText, activeTab === 'detailed' && styles.tabTextActive]}>
-                            Detailed View
-                        </Text>
-                    </TouchableOpacity>
+                {/* Tabs */}
+                <View style={s.tabs}>
+                    {(['members', 'mine'] as const).map(t => (
+                        <TouchableOpacity
+                            key={t}
+                            style={[s.tab, activeTab === t && s.tabActive]}
+                            onPress={() => setActiveTab(t)}
+                        >
+                            <Text style={[s.tabText, activeTab === t && s.tabTextActive]}>
+                                {t === 'members' ? 'All Members' : 'My Payments'}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
                 </View>
 
-                {/* Summary View */}
-                {activeTab === 'summary' && (
-                    <View style={styles.summaryContent}>
-                        {balances.map((member) => (
-                            <MemberBalanceCard
-                                key={member.userId}
-                                member={member}
-                                isCurrentUser={member.userId === user?.id}
+                {/* All Members */}
+                {activeTab === 'members' && (
+                    <View style={s.card}>
+                        {balances.map(m => (
+                            <MemberRow
+                                key={m.userId}
+                                member={m}
+                                isCurrentUser={m.userId === user?.id}
                             />
                         ))}
+                        {balances.length === 0 && (
+                            <Text style={s.emptyNote}>No members yet</Text>
+                        )}
                     </View>
                 )}
 
-                {/* Detailed View */}
-                {activeTab === 'detailed' && (
-                    <View style={styles.detailedContent}>
-                        {/* Payments to Make */}
+                {/* My Payments */}
+                {activeTab === 'mine' && (
+                    <View style={s.paySection}>
                         {oweList.length > 0 && (
-                            <View style={styles.paymentSection}>
-                                <Text style={[typographyStyles.labelMedium, styles.paymentSectionTitle]}>
-                                    Payments to Make
-                                </Text>
-                                {oweList.map((item, index) => (
-                                    <PaymentCard
-                                        key={index}
-                                        fromUser={item.fromUser}
-                                        toUser={item.toUser}
-                                        amount={item.amount}
+                            <View>
+                                <Text style={s.sectionLabel}>YOU NEED TO PAY</Text>
+                                {oweList.map((settlement, i) => (
+                                    <PaymentRow
+                                        key={settlement.id || i}
+                                        name={settlement.toUserName}
+                                        amount={settlement.amount}
                                         type="owe"
-                                        onAction={() => handlePayNow(item.toUser, item.amount)}
+                                        onPress={goToSettlements}
                                     />
                                 ))}
                             </View>
                         )}
-
-                        {/* Payments to Receive */}
                         {receiveList.length > 0 && (
-                            <View style={styles.paymentSection}>
-                                <Text style={[typographyStyles.labelMedium, styles.paymentSectionTitle]}>
-                                    Payments to Receive
-                                </Text>
-                                {receiveList.map((item, index) => (
-                                    <PaymentCard
-                                        key={index}
-                                        fromUser={item.fromUser}
-                                        toUser={item.toUser}
-                                        amount={item.amount}
+                            <View>
+                                <Text style={s.sectionLabel}>YOU'LL RECEIVE</Text>
+                                {receiveList.map((settlement, i) => (
+                                    <PaymentRow
+                                        key={settlement.id || i}
+                                        name={settlement.fromUserName}
+                                        amount={settlement.amount}
                                         type="receive"
-                                        onAction={() => handleRequestPayment(item.fromUser, item.amount)}
+                                        onPress={goToSettlements}
                                     />
                                 ))}
                             </View>
                         )}
-
                         {oweList.length === 0 && receiveList.length === 0 && (
-                            <View style={styles.settledContainer}>
-                                <Ionicons name="checkmark-circle-outline" size={48} color={colors.success} />
-                                <Text style={[typographyStyles.bodyMedium, styles.settledText]}>
-                                    All settled up! 🎉
+                            <View style={s.emptyCard}>
+                                <Ionicons name="checkmark-circle-outline" size={40} color={colors.success} />
+                                <Text style={[typographyStyles.bodyMedium, { color: colors.success, marginTop: 8 }]}>
+                                    You're all squared away!
                                 </Text>
-                                <Text style={[typographyStyles.bodySmall, styles.settledSubtext]}>
-                                    Everyone is paid up in this group
+                                <Text style={[typographyStyles.bodySmall, { color: colors.outline, textAlign: 'center' }]}>
+                                    No pending payments for you
                                 </Text>
                             </View>
                         )}
                     </View>
                 )}
-            </ScrollView>
 
-            {/* Bottom Actions */}
-            <View style={styles.bottomContainer}>
-                <TouchableOpacity style={styles.primaryButton} onPress={handleViewSettlements}>
-                    <Ionicons name="mic-outline" size={20} color={colors.onPrimary} />
-                    <Text style={[typographyStyles.buttonLarge, styles.primaryButtonText]}>
-                        View Settlement Suggestions
-                    </Text>
+                {/* View Settle Up */}
+                <TouchableOpacity style={s.settleBtn} onPress={goToSettlements}>
+                    <Ionicons name="wallet-outline" size={18} color={colors.onPrimary} />
+                    <Text style={s.settleBtnText}>View Settle Up</Text>
+                    <Ionicons name="arrow-forward-outline" size={16} color={colors.onPrimary} />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.secondaryButton} onPress={handleExportBalances}>
-                    <Ionicons name="download-outline" size={20} color={colors.primary} />
-                    <Text style={[typographyStyles.buttonMedium, styles.secondaryButtonText]}>
-                        Export Balances
-                    </Text>
-                </TouchableOpacity>
-            </View>
+            </ScrollView>
         </View>
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: colors.background,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: colors.background,
-    },
+const s = StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.gutter,
-        paddingTop: spacing.md,
-        paddingBottom: spacing.sm,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingHorizontal: spacing.gutter, paddingTop: spacing.md, paddingBottom: spacing.sm,
         backgroundColor: colors.surface,
     },
-    backButton: {
-        padding: spacing.sm,
+    backBtn: { padding: spacing.sm, width: 40 },
+    headerTitle: { color: colors.primary, fontSize: 18 },
+    scroll: {
+        paddingHorizontal: spacing.gutter, paddingBottom: 60,
+        paddingTop: spacing.md, gap: spacing.lg,
     },
-    headerTitle: {
-        color: colors.primary,
-        fontSize: 18,
+    // Hero
+    hero: {
+        borderRadius: spacing.borderRadiusLg, padding: spacing.lg,
+        alignItems: 'center', gap: 4,
     },
-    shareButton: {
-        padding: spacing.sm,
+    heroLabel: {
+        fontSize: 11, fontWeight: '600', color: colors.onSurfaceVariant,
+        letterSpacing: 1.5, fontFamily: 'Inter_600SemiBold',
     },
-    scrollContent: {
-        paddingHorizontal: spacing.gutter,
-        paddingBottom: 160,
-        gap: spacing.lg,
-        paddingTop: spacing.md,
+    heroAmount: {
+        fontSize: 52, fontWeight: '800', lineHeight: 60,
+        fontFamily: 'Inter_800ExtraBold',
     },
-    summaryCard: {
-        backgroundColor: colors.secondaryFixed,
-        borderRadius: spacing.borderRadiusLg,
-        padding: spacing.lg,
-        alignItems: 'center',
-        shadowColor: colors.onSurface,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        elevation: 4,
-    },
-    summaryLabel: {
-        color: colors.secondary,
-        marginBottom: 4,
-    },
-    summaryTotal: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: '#2A3E4B',
-        marginBottom: 4,
-    },
-    summaryDivider: {
-        width: '100%',
-        height: 1,
-        backgroundColor: colors.primaryContainer + '20',
-        marginVertical: spacing.sm,
-    },
-    summaryShare: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#2A3E4B',
-    },
-    personalCard: {
-        borderRadius: spacing.borderRadiusLg,
-        padding: spacing.md,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderLeftWidth: 4,
-        borderLeftColor: colors.error,
-    },
-    personalLabel: {
-        color: colors.error,
-    },
-    personalAmount: {
-        fontSize: 24,
-        color: colors.error,
-    },
-    personalBadge: {
-        backgroundColor: 'transparent',
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 4,
-        borderRadius: spacing.borderRadiusFull,
-    },
-    personalBadgeText: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: colors.error,
-    },
-    tabContainer: {
-        flexDirection: 'row',
-        backgroundColor: colors.surfaceContainerLow,
-        borderRadius: spacing.borderRadiusFull,
-        padding: 4,
-    },
-    tab: {
-        flex: 1,
+    heroStatus: { fontSize: 13, fontWeight: '600', fontFamily: 'Inter_600SemiBold', marginBottom: 4 },
+    heroStats: {
+        flexDirection: 'row', width: '100%', marginTop: spacing.sm,
+        backgroundColor: 'rgba(255,255,255,0.55)', borderRadius: spacing.borderRadiusMd,
         paddingVertical: spacing.sm,
-        borderRadius: spacing.borderRadiusFull,
-        alignItems: 'center',
     },
+    heroStat: { flex: 1, alignItems: 'center' },
+    heroStatLabel: { fontSize: 11, color: colors.onSurfaceVariant, fontFamily: 'Inter_400Regular' },
+    heroStatValue: { fontSize: 14, fontWeight: '700', color: colors.onSurface, fontFamily: 'Inter_700Bold' },
+    heroStatDivider: { width: 1, backgroundColor: colors.outlineVariant + '50' },
+    // Tabs
+    tabs: {
+        flexDirection: 'row', backgroundColor: colors.surfaceContainerLow,
+        borderRadius: spacing.borderRadiusFull, padding: 4,
+    },
+    tab: { flex: 1, paddingVertical: spacing.sm, borderRadius: spacing.borderRadiusFull, alignItems: 'center' },
     tabActive: {
         backgroundColor: colors.surface,
-        shadowColor: colors.onSurface,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowColor: colors.onSurface, shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
     },
-    tabText: {
-        color: colors.onSurfaceVariant,
+    tabText: { fontSize: 13, fontWeight: '500', color: colors.onSurfaceVariant, fontFamily: 'Inter_500Medium' },
+    tabTextActive: { color: colors.primary },
+    // Members list
+    card: {
+        backgroundColor: colors.surfaceContainerLowest, borderRadius: spacing.borderRadiusLg,
+        overflow: 'hidden', borderWidth: 1, borderColor: colors.outlineVariant + '40',
     },
-    tabTextActive: {
-        color: colors.primary,
+    memberRow: {
+        flexDirection: 'row', alignItems: 'center',
+        paddingHorizontal: spacing.md, paddingVertical: 10, gap: spacing.sm,
+        borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.outlineVariant + '40',
     },
-    summaryContent: {
-        gap: spacing.md,
+    avatar: {
+        width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryContainer,
+        alignItems: 'center', justifyContent: 'center', flexShrink: 0,
     },
-    memberCard: {
-        backgroundColor: colors.surfaceContainerLowest,
-        borderRadius: spacing.borderRadiusLg,
-        padding: spacing.md,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: colors.outlineVariant + '50',
-        shadowColor: colors.onSurface,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
-        elevation: 2,
+    avatarYou: { borderWidth: 2, borderColor: colors.primary },
+    avatarText: { fontSize: 16, fontWeight: '700', color: colors.onPrimary, fontFamily: 'Inter_700Bold' },
+    memberInfo: { flex: 1 },
+    memberName: { fontSize: 14, fontWeight: '600', color: colors.onSurface, fontFamily: 'Inter_600SemiBold' },
+    memberLabel: { fontSize: 12, color: colors.onSurfaceVariant, fontFamily: 'Inter_400Regular', marginTop: 1 },
+    memberAmount: { fontSize: 15, fontWeight: '700', fontFamily: 'Inter_700Bold', flexShrink: 0 },
+    emptyNote: { textAlign: 'center', color: colors.outline, padding: spacing.lg, fontFamily: 'Inter_400Regular' },
+    // My Payments
+    paySection: { gap: spacing.md },
+    sectionLabel: {
+        fontSize: 11, fontWeight: '600', color: colors.onSurfaceVariant,
+        letterSpacing: 0.8, marginBottom: 6, fontFamily: 'Inter_600SemiBold',
     },
-    memberLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-        flex: 1,
+    payRow: {
+        flexDirection: 'row', alignItems: 'center', borderRadius: spacing.borderRadiusLg,
+        padding: spacing.md, gap: spacing.sm, marginBottom: spacing.sm,
     },
-    memberAvatar: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: colors.primaryContainer,
-        alignItems: 'center',
-        justifyContent: 'center',
+    payInfo: { flex: 1 },
+    payLabel: { fontSize: 11, color: colors.onSurfaceVariant, fontFamily: 'Inter_400Regular' },
+    payName: { fontSize: 14, fontWeight: '600', color: colors.onSurface, fontFamily: 'Inter_600SemiBold' },
+    payRight: { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
+    payAmount: { fontSize: 15, fontWeight: '700', fontFamily: 'Inter_700Bold' },
+    payBtn: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: spacing.borderRadiusFull },
+    payBtnRed: { backgroundColor: colors.error },
+    payBtnGreen: { borderWidth: 1, borderColor: '#10B981' },
+    payBtnText: { fontSize: 11, fontWeight: '600', color: colors.onPrimary, fontFamily: 'Inter_600SemiBold' },
+    payBtnTextGreen: { color: '#10B981' },
+    emptyCard: {
+        backgroundColor: colors.surfaceContainerLowest, borderRadius: spacing.borderRadiusLg,
+        padding: spacing.xl, alignItems: 'center', gap: 4,
     },
-    currentUserAvatar: {
-        borderWidth: 2,
-        borderColor: colors.primary,
+    // Bottom button
+    settleBtn: {
+        flexDirection: 'row', backgroundColor: colors.primary, borderRadius: spacing.borderRadiusFull,
+        paddingVertical: spacing.md, paddingHorizontal: spacing.lg,
+        alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+        shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2, shadowRadius: 8, elevation: 4,
     },
-    memberAvatarText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: colors.onPrimary,
-    },
-    memberName: {
-        color: colors.onSurface,
-        fontWeight: 'bold',
-    },
-    memberDetails: {
-        color: colors.onSurfaceVariant,
-    },
-    memberRight: {
-        alignItems: 'flex-end',
-    },
-    statusText: {
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
-    amountText: {
-        fontWeight: 'bold',
-    },
-    detailedContent: {
-        gap: spacing.lg,
-    },
-    paymentSection: {
-        gap: spacing.sm,
-    },
-    paymentSectionTitle: {
-        color: colors.onSurfaceVariant,
-        textTransform: 'uppercase',
-        marginLeft: spacing.xs,
-    },
-    paymentCard: {
-        backgroundColor: colors.surfaceContainerLowest,
-        borderRadius: spacing.borderRadiusLg,
-        padding: spacing.md,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: colors.errorContainer + '50',
-        shadowColor: colors.onSurface,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
-        elevation: 2,
-    },
-    paymentLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-    },
-    paymentIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    paymentText: {
-        color: colors.onSurface,
-    },
-    paymentName: {
-        fontWeight: 'bold',
-    },
-    paymentAmount: {
-        fontSize: 20,
-    },
-    paymentButton: {
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        borderRadius: spacing.borderRadiusFull,
-    },
-    payButton: {
-        backgroundColor: colors.primary,
-    },
-    requestButton: {
-        borderWidth: 1,
-        borderColor: colors.primary,
-    },
-    paymentButtonText: {
-        color: colors.onPrimary,
-    },
-    bottomContainer: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        paddingHorizontal: spacing.gutter,
-        paddingBottom: spacing.lg,
-        paddingTop: spacing.md,
-        backgroundColor: colors.background + 'CC',
-        gap: spacing.sm,
-    },
-    primaryButton: {
-        flexDirection: 'row',
-        backgroundColor: colors.primary,
-        borderRadius: spacing.borderRadiusFull,
-        height: 56,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: spacing.sm,
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
-        shadowRadius: 8,
-        elevation: 4,
-    },
-    primaryButtonText: {
-        color: colors.onPrimary,
-    },
-    secondaryButton: {
-        flexDirection: 'row',
-        borderWidth: 1,
-        borderColor: colors.primary,
-        borderRadius: spacing.borderRadiusFull,
-        height: 48,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: spacing.sm,
-    },
-    secondaryButtonText: {
-        color: colors.primary,
-    },
-    settledContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: spacing.xl,
-        gap: spacing.sm,
-    },
-    settledText: {
-        color: colors.success,
-        marginTop: spacing.sm,
-    },
-    settledSubtext: {
-        color: colors.outline,
-    },
+    settleBtnText: { fontSize: 15, fontWeight: '600', color: colors.onPrimary, fontFamily: 'Inter_600SemiBold' },
 });

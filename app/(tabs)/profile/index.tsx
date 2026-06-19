@@ -163,7 +163,7 @@ export default function ProfileScreen() {
     };
 
     const handleEditProfile = () => {
-        setIsEditModalVisible(true);
+        router.push('/profile/edit');
     };
 
     const handleUpdateProfile = async (data: { fullName: string }) => {

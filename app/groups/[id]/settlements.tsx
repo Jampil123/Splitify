@@ -1,3 +1,4 @@
+import { createNotification } from '@/services/api/notifications';
 import { db } from '@/services/firebase/config';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
@@ -21,13 +22,16 @@ import {
 // Settlement Card Component
 function SettlementCard({
     settlement,
+    currentUserId,
     onMarkPaid,
     onRemind,
 }: {
     settlement: Settlement;
+    currentUserId: string;
     onMarkPaid: (id: string) => void;
     onRemind: (id: string) => void;
 }) {
+    const isCreditor = settlement.toUserId === currentUserId;
     const getInitials = (name: string) => name.charAt(0).toUpperCase();
 
     return (
@@ -43,8 +47,8 @@ function SettlementCard({
                             <Text style={styles.avatarText}>{getInitials(settlement.toUserName)}</Text>
                         </View>
                     </View>
-                    <View>
-                        <Text style={[typographyStyles.labelMedium, styles.paymentLabel]}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={[typographyStyles.labelMedium, styles.paymentLabel]} numberOfLines={1}>
                             {settlement.fromUserName} <Text style={styles.toText}>to</Text> {settlement.toUserName}
                         </Text>
                         <Text style={[typographyStyles.headlineMedium, styles.paymentAmount]}>
@@ -58,7 +62,7 @@ function SettlementCard({
                     </Text>
                 </View>
             </View>
-            {settlement.status === 'pending' && (
+            {settlement.status === 'pending' && isCreditor && (
                 <View style={styles.cardActions}>
                     <TouchableOpacity style={styles.markPaidButton} onPress={() => onMarkPaid(settlement.id)}>
                         <Text style={[typographyStyles.labelMedium, styles.markPaidText]}>Mark as Paid</Text>
@@ -189,12 +193,21 @@ export default function SettlementsScreen() {
 
     const handleRemind = async (settlementId: string) => {
         const settlement = settlements.find(s => s.id === settlementId);
-        if (settlement) {
-            Alert.alert(
-                'Reminder Sent',
-                `A reminder has been sent to ${settlement.fromUserName} to pay ${settlement.toUserName} ₱${settlement.amount.toFixed(2)}`
-            );
-            // TODO: Implement actual notification
+        if (!settlement) return;
+
+        try {
+            await createNotification({
+                userId: (settlement as any).fromUserId,
+                title: 'Payment Reminder',
+                body: `You owe ${settlement.toUserName} ₱${settlement.amount.toFixed(2)}. Please settle up!`,
+                type: 'settlement_reminder',
+                groupId,
+                relatedUserId: user?.id,
+                settlementId,
+            });
+            Alert.alert('Reminder Sent', `${settlement.fromUserName} has been reminded to pay ₱${settlement.amount.toFixed(2)}`);
+        } catch {
+            Alert.alert('Error', 'Failed to send reminder');
         }
     };
 
@@ -255,6 +268,7 @@ export default function SettlementsScreen() {
                             <SettlementCard
                                 key={settlement.id}
                                 settlement={settlement}
+                                currentUserId={user?.id || ''}
                                 onMarkPaid={handleMarkPaid}
                                 onRemind={handleRemind}
                             />
@@ -336,7 +350,7 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
     },
     infoText: {
-        color: colors.secondaryContainer,
+        color: colors.secondary,
         flex: 1,
         lineHeight: 20,
     },
@@ -386,6 +400,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.md,
+        flex: 1,
     },
     avatarRow: {
         flexDirection: 'row',

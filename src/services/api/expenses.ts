@@ -71,7 +71,7 @@ export async function addExpense(
     await updateDoc(groupRef, {
       lastActivityAt: now,
     });
-    
+
     return docRef.id;
   } catch (error) {
     console.error('Error adding expense:', error);
@@ -141,13 +141,13 @@ export async function updateExpense(
     }
     
     await updateDoc(expenseRef, updateData);
-    
+
     // Update group last activity
     const groupRef = doc(db, 'groups', groupId);
     await updateDoc(groupRef, {
       lastActivityAt: serverTimestamp(),
     });
-    
+
     return true;
   } catch (error) {
     console.error('Error updating expense:', error);
@@ -171,7 +171,7 @@ export async function deleteExpense(groupId: string, expenseId: string): Promise
     await updateDoc(groupRef, {
       lastActivityAt: serverTimestamp(),
     });
-    
+
     return true;
   } catch (error) {
     console.error('Error deleting expense:', error);

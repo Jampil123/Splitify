@@ -1,4 +1,5 @@
 import { db } from '@/services/firebase/config';
+import { refreshSettlementSuggestions } from '@/services/api/settlements';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
 import { Group, GroupMember } from '@/types';
@@ -11,6 +12,7 @@ import {
     ActivityIndicator,
     Alert,
     KeyboardAvoidingView,
+    Modal,
     Platform,
     ScrollView,
     StyleSheet,
@@ -59,6 +61,8 @@ export default function AddExpenseScreen() {
     });
 
     const [selectedPayer, setSelectedPayer] = useState<GroupMember | null>(null);
+    const [showDateModal, setShowDateModal] = useState(false);
+    const [dateInputText, setDateInputText] = useState('');
 
     // Fetch group data
     useEffect(() => {
@@ -149,18 +153,31 @@ export default function AddExpenseScreen() {
                 lastActivityAt: serverTimestamp(),
             });
 
+            await refreshSettlementSuggestions(groupId);
+
             Alert.alert(
                 'Success',
                 'Expense added successfully!',
                 [{ text: 'OK', onPress: () => router.back() }]
             );
-            
+
         } catch (error: any) {
             console.error('Error adding expense:', error);
             Alert.alert('Error', error.message || 'Failed to add expense');
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const handleDateConfirm = () => {
+        const parsed = new Date(dateInputText);
+        if (isNaN(parsed.getTime())) {
+            Alert.alert('Invalid Date', 'Please enter a valid date in YYYY-MM-DD format');
+            return;
+        }
+        setExpense(prev => ({ ...prev, date: parsed }));
+        setShowDateModal(false);
+        setDateInputText('');
     };
 
     const selectPayer = (member: GroupMember) => {
@@ -320,7 +337,10 @@ export default function AddExpenseScreen() {
                 {/* ✅ Date - Full Width */}
                 <View style={styles.inputGroup}>
                     <Text style={[typographyStyles.labelMedium, styles.label]}>Date</Text>
-                    <TouchableOpacity style={styles.pickerButton}>
+                    <TouchableOpacity style={styles.pickerButton} onPress={() => {
+                        setDateInputText('');
+                        setShowDateModal(true);
+                    }}>
                         <View style={styles.pickerLeft}>
                             <Ionicons name="calendar-outline" size={20} color={colors.primary} />
                             <Text style={styles.pickerDateText}>{formatDate(expense.date)}</Text>
@@ -401,6 +421,43 @@ export default function AddExpenseScreen() {
                     )}
                 </TouchableOpacity>
             </View>
+            {/* Date Picker Modal */}
+            <Modal visible={showDateModal} transparent animationType="fade" onRequestClose={() => setShowDateModal(false)}>
+                <TouchableOpacity style={styles.dateModalOverlay} activeOpacity={1} onPress={() => setShowDateModal(false)}>
+                    <TouchableOpacity style={styles.dateModalContent} activeOpacity={1}>
+                        <Text style={[typographyStyles.headlineSmall, styles.dateModalTitle]}>Select Date</Text>
+                        <View style={styles.dateQuickButtons}>
+                            <TouchableOpacity style={styles.dateQuickBtn} onPress={() => {
+                                setExpense(prev => ({ ...prev, date: new Date() }));
+                                setShowDateModal(false);
+                            }}>
+                                <Text style={[typographyStyles.labelMedium, styles.dateQuickBtnText]}>Today</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.dateQuickBtn} onPress={() => {
+                                const d = new Date();
+                                d.setDate(d.getDate() - 1);
+                                setExpense(prev => ({ ...prev, date: d }));
+                                setShowDateModal(false);
+                            }}>
+                                <Text style={[typographyStyles.labelMedium, styles.dateQuickBtnText]}>Yesterday</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <Text style={[typographyStyles.bodySmall, styles.dateOrLabel]}>or enter a custom date</Text>
+                        <TextInput
+                            style={styles.dateTextInput}
+                            placeholder="YYYY-MM-DD"
+                            placeholderTextColor={colors.outline}
+                            value={dateInputText}
+                            onChangeText={setDateInputText}
+                            keyboardType="numbers-and-punctuation"
+                            maxLength={10}
+                        />
+                        <TouchableOpacity style={styles.dateConfirmBtn} onPress={handleDateConfirm}>
+                            <Text style={[typographyStyles.labelMedium, styles.dateConfirmBtnText]}>Confirm</Text>
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
         </KeyboardAvoidingView>
     );
 }
@@ -650,5 +707,61 @@ const styles = StyleSheet.create({
     confirmText: {
         color: colors.OnPrimaryContainer,
         fontSize: 16,
+    },
+    dateModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    dateModalContent: {
+        backgroundColor: colors.surface,
+        borderRadius: spacing.borderRadiusLg,
+        padding: spacing.lg,
+        width: '85%',
+        gap: spacing.md,
+    },
+    dateModalTitle: {
+        color: colors.onSurface,
+        textAlign: 'center',
+    },
+    dateQuickButtons: {
+        flexDirection: 'row',
+        gap: spacing.sm,
+    },
+    dateQuickBtn: {
+        flex: 1,
+        backgroundColor: colors.secondaryContainer,
+        paddingVertical: spacing.sm,
+        borderRadius: spacing.borderRadiusFull,
+        alignItems: 'center',
+    },
+    dateQuickBtnText: {
+        color: colors.onSurface,
+    },
+    dateOrLabel: {
+        color: colors.onSurfaceVariant,
+        textAlign: 'center',
+    },
+    dateTextInput: {
+        backgroundColor: colors.surfaceBright,
+        borderWidth: 1,
+        borderColor: colors.secondaryContainer,
+        borderRadius: spacing.borderRadiusLg,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.md,
+        fontSize: 16,
+        fontFamily: 'Inter_400Regular',
+        color: colors.onSurface,
+        textAlign: 'center',
+    },
+    dateConfirmBtn: {
+        backgroundColor: colors.primary,
+        paddingVertical: spacing.md,
+        borderRadius: spacing.borderRadiusFull,
+        alignItems: 'center',
+    },
+    dateConfirmBtnText: {
+        color: colors.onPrimary,
     },
 });

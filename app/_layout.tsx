@@ -167,7 +167,47 @@ export default function RootLayout() {
                     animation: 'slide_from_right',
                 }} 
             />
-            
+
+            <Stack.Screen 
+                name="groups/[id]/expenses/list" 
+                options={{ 
+                    headerShown: false,
+                    animation: 'slide_from_right',
+                }} 
+            />
+
+            <Stack.Screen
+                name="groups/[id]/members/list"
+                options={{
+                    headerShown: false,
+                    animation: 'slide_from_right',
+                }}
+            />
+
+            <Stack.Screen
+                name="groups/[id]/settings"
+                options={{
+                    headerShown: false,
+                    animation: 'slide_from_right',
+                }}
+            />
+
+            <Stack.Screen
+                name="profile/edit"
+                options={{
+                    headerShown: false,
+                    animation: 'slide_from_right',
+                }}
+            />
+
+            <Stack.Screen
+                name="notifications/[notificationId]"
+                options={{
+                    headerShown: false,
+                    animation: 'slide_from_right',
+                }}
+            />
+
         </Stack>
     );
 }

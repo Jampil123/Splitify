@@ -1,3 +1,4 @@
+import { DropdownMenu } from '@/components/common/DropdownMenu';
 import { db } from '@/services/firebase/config';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
@@ -81,9 +82,9 @@ function ExpenseItem({ expense, onPress }: { expense: any; onPress: () => void }
                 <View style={styles.expenseIcon}>
                     <Ionicons name={getCategoryIcon(expense.category || 'other')} size={20} color={colors.primary} />
                 </View>
-                <View>
-                    <Text style={[typographyStyles.bodyMedium, styles.expenseTitle]}>{expense.title}</Text>
-                    <Text style={[typographyStyles.bodySmall, styles.expenseMeta]}>
+                <View style={{ flex: 1 }}>
+                    <Text style={[typographyStyles.bodyMedium, styles.expenseTitle]} numberOfLines={1}>{expense.title}</Text>
+                    <Text style={[typographyStyles.bodySmall, styles.expenseMeta]} numberOfLines={1}>
                         Paid by {expense.payerName} • {formatDate(expense.date)}
                     </Text>
                 </View>
@@ -180,13 +181,17 @@ export default function GroupDetailsScreen() {
     
 
     const handleViewAllMembers = () => {
-        // TODO: Navigate to members screen
-        Alert.alert('Coming Soon', 'Members screen coming soon');
+        router.push({
+            pathname: '/groups/[id]/members/list',
+            params: { id: id }
+        });
     };
 
     const handleViewAllExpenses = () => {
-        // TODO: Navigate to expenses list
-        Alert.alert('Coming Soon', 'All expenses screen coming soon');
+        router.push({
+            pathname: '/groups/[id]/expenses/list',
+            params: { id: id }
+        });
     };
 
     const handleExpensePress = (expenseId: string) => {
@@ -239,9 +244,28 @@ export default function GroupDetailsScreen() {
                 <Text style={[typographyStyles.headlineMedium, styles.headerTitle]} numberOfLines={1}>
                     {group.groupName}
                 </Text>
-                <TouchableOpacity style={styles.menuButton}>
-                    <Ionicons name="ellipsis-vertical" size={24} color={colors.primary} />
-                </TouchableOpacity>
+                <DropdownMenu
+                    items={[
+                        {
+                            id: 'settings',
+                            label: 'Group Settings',
+                            icon: 'settings-outline',
+                            onPress: () => router.push({ pathname: '/groups/[id]/settings', params: { id } }),
+                        },
+                        {
+                            id: 'members',
+                            label: 'Manage Members',
+                            icon: 'people-outline',
+                            onPress: handleViewAllMembers,
+                        },
+                        {
+                            id: 'settlements',
+                            label: 'View Settlements',
+                            icon: 'wallet-outline',
+                            onPress: () => router.push({ pathname: '/groups/[id]/settlements', params: { id } }),
+                        },
+                    ]}
+                />
             </View>
 
             <ScrollView
@@ -267,7 +291,7 @@ export default function GroupDetailsScreen() {
                     </View>
                     <View style={styles.groupInfo}>
                         <View style={styles.groupNameRow}>
-                            <Text style={[typographyStyles.headlineMedium, styles.groupName]}>
+                            <Text style={[typographyStyles.headlineMedium, styles.groupName]} numberOfLines={1}>
                                 {group.groupName}
                             </Text>
                             <View style={styles.memberCountChip}>
@@ -293,7 +317,10 @@ export default function GroupDetailsScreen() {
                         </Text>
                     </View>
                     {!isSettled && (
-                        <TouchableOpacity style={[styles.balanceButton, { backgroundColor: balanceColor }]}>
+                        <TouchableOpacity
+                            style={[styles.balanceButton, { backgroundColor: balanceColor }]}
+                            onPress={() => router.push({ pathname: '/groups/[id]/settlements', params: { id } })}
+                        >
                             <Text style={styles.balanceButtonText}>
                                 {isOwed ? 'Request' : 'Settle Now'}
                             </Text>
@@ -418,7 +445,10 @@ export default function GroupDetailsScreen() {
                                     </Text>
                                 </Text>
                             </View>
-                            <TouchableOpacity style={styles.remindButton}>
+                            <TouchableOpacity
+                                style={styles.remindButton}
+                                onPress={() => router.push({ pathname: '/groups/[id]/settlements', params: { id } })}
+                            >
                                 <Text style={[typographyStyles.labelMedium, styles.remindButtonText]}>
                                     {isOwed ? 'Request' : 'Settle'}
                                 </Text>
@@ -538,6 +568,8 @@ const styles = StyleSheet.create({
     groupName: {
         fontSize: 18,
         color: colors.onSurface,
+        flex: 1,
+        flexShrink: 1,
     },
     memberCountChip: {
         backgroundColor: colors.surfaceContainer,
@@ -711,7 +743,7 @@ const styles = StyleSheet.create({
     moreMembersText: {
         fontSize: 16,
         fontWeight: '600',
-        color: colors.secondaryContainer,
+        color: colors.secondary,
     },
     inviteButton: {
         width: 56,
@@ -847,7 +879,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     settlementTip: {
-        color: colors.secondaryContainer,
+        color: colors.secondary,
         textAlign: 'center',
         fontStyle: 'italic',
     },
