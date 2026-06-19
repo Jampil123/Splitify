@@ -12,6 +12,7 @@ import {
     where,
     writeBatch
 } from '../firebase/config';
+import { onSnapshot } from 'firebase/firestore';
 
 import { GroupBalanceSummary, MarkSettlementData, Settlement } from '@/types';
 import {
@@ -23,6 +24,26 @@ import {
 } from '@/utils/calculations';
 import { getGroupExpenses } from './expenses';
 import { getGroup } from './groups';
+
+// ─── Real-time subscription ───────────────────────────────────────────────────
+
+/**
+ * Subscribe to a group's pending settlements.
+ * Fires immediately with current data and on every subsequent change.
+ */
+export function subscribeToGroupSettlements(
+    groupId: string,
+    callback: (settlements: Settlement[]) => void
+): () => void {
+    const q = query(
+        collection(db, 'groups', groupId, 'settlements'),
+        where('status', '==', 'pending'),
+        orderBy('suggestedAt', 'desc')
+    );
+    return onSnapshot(q, snap => {
+        callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as Settlement)));
+    });
+}
 
 // ============ Settlement Operations ============
 
@@ -169,32 +190,49 @@ export async function refreshSettlementSuggestions(groupId: string): Promise<Set
     const expenses = await getGroupExpenses(groupId);
     const totalExpense = calculateTotalExpense(expenses);
     
-    // Prepare member data with total paid
+    // Prepare member data — handles both equal and custom splits
     const memberData = group.members.map(member => {
       const totalPaid = expenses
         .filter(e => e.payerId === member.userId && !e.isDeleted)
         .reduce((sum, e) => sum + e.amount, 0);
-      
+
+      const totalShare = expenses
+        .filter(e => !e.isDeleted)
+        .reduce((sum, e) => {
+          if (e.splitType === 'custom' && e.splits && e.splits[member.userId] !== undefined) {
+            return sum + (e.splits[member.userId] || 0);
+          }
+          return sum + e.amount / group.memberCount;
+        }, 0);
+
       return {
         userId: member.userId,
         userName: member.fullName,
         totalPaid,
+        totalShare,
+        balance: totalPaid - totalShare,
       };
     });
-    
+
     const individualShare = calculateIndividualShare(totalExpense, group.memberCount);
-    const balances = calculateAllMemberBalances(memberData, totalExpense);
+    const balances: UserBalance[] = memberData.map(m => ({
+      userId: m.userId,
+      userName: m.userName,
+      totalPaid: m.totalPaid,
+      totalShare: m.totalShare,
+      balance: m.balance,
+    }));
     const settlementSuggestions = generateSettlements(balances);
     const fullySettled = isFullySettled(balances);
-    
-    // Update group with new balances and settled status
+
+    // Update group with new per-member balances
     const updatedMembers = group.members.map(member => {
-      const balanceData = balances.find(b => b.userId === member.userId);
+      const memberBal = memberData.find(m => m.userId === member.userId);
       return {
         ...member,
-        totalPaid: balanceData?.totalPaid || 0,
-        totalShare: individualShare,
-        balance: balanceData?.balance || 0,
+        totalPaid: memberBal?.totalPaid || 0,
+        totalShare: memberBal?.totalShare || 0,
+        balance: memberBal?.balance || 0,
       };
     });
     

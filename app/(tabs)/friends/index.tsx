@@ -1,11 +1,12 @@
-﻿import { useFriends } from '@/services/hooks/useFriends';
+﻿import { subscribeToConversations } from '@/services/api/chat';
+import { useFriends } from '@/services/hooks/useFriends';
 import { usePresence } from '@/services/hooks/usePresence';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
     Alert,
     FlatList,
@@ -25,10 +26,11 @@ interface FriendCardProps {
     mutualGroups: number;
     avatar?: string | null;
     isOnline?: boolean;
+    unreadCount?: number;
     onChat?: () => void;
 }
 
-function FriendCard({ id, name, mutualGroups, avatar, isOnline, onChat }: FriendCardProps) {
+function FriendCard({ id, name, mutualGroups, avatar, isOnline, unreadCount = 0, onChat }: FriendCardProps) {
     return (
         <View style={styles.friendCard}>
             <View style={styles.avatarWrapper}>
@@ -53,6 +55,13 @@ function FriendCard({ id, name, mutualGroups, avatar, isOnline, onChat }: Friend
             </View>
             <TouchableOpacity style={styles.chatButton} onPress={onChat}>
                 <Ionicons name="chatbubble-outline" size={20} color={colors.secondary} />
+                {unreadCount > 0 && (
+                    <View style={styles.chatBadge}>
+                        <Text style={styles.chatBadgeText}>
+                            {unreadCount > 99 ? '99+' : unreadCount}
+                        </Text>
+                    </View>
+                )}
             </TouchableOpacity>
         </View>
     );
@@ -179,6 +188,22 @@ export default function FriendsScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+    const [unreadMap, setUnreadMap] = useState<Record<string, number>>({});
+
+    useEffect(() => {
+        if (!user?.id) return;
+        const unsub = subscribeToConversations(user.id, conversations => {
+            const map: Record<string, number> = {};
+            conversations.forEach(conv => {
+                const otherId = conv.participants.find(p => p !== user.id);
+                if (otherId) {
+                    map[otherId] = conv.unreadCount?.[user.id] ?? 0;
+                }
+            });
+            setUnreadMap(map);
+        });
+        return unsub;
+    }, [user?.id]);
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
@@ -268,8 +293,16 @@ export default function FriendsScreen() {
             mutualGroups={0}
             avatar={item.photoURL || undefined}
             isOnline={onlineMap[item.id] === true}
+            unreadCount={unreadMap[item.id] ?? 0}
             onChat={() => {
-                Alert.alert('Chat', `Chat with ${item.fullName} coming soon`);
+                router.push({
+                    pathname: '/chat/[friendId]',
+                    params: {
+                        friendId: item.id,
+                        friendName: item.fullName,
+                        friendPhoto: item.photoURL || '',
+                    },
+                });
             }}
         />
     );
@@ -629,6 +662,25 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: colors.surface,
+    },
+    chatBadge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        backgroundColor: colors.error,
+        borderRadius: 8,
+        minWidth: 16,
+        height: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 3,
+        borderWidth: 1.5,
+        borderColor: colors.secondaryContainer,
+    },
+    chatBadgeText: {
+        fontSize: 9,
+        fontWeight: 'bold',
+        color: colors.onError,
     },
     // Request Card
     requestCard: {

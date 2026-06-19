@@ -28,7 +28,7 @@ export interface Expense {
     // Split details
     splitType: 'equal' | 'custom';
     individualShare?: number;
-    splits?: ExpenseSplit[];
+    splits?: Record<string, number>;
     
     // Optional
     category?: 'travel' | 'food' | 'accommodation' | 'utilities' | 'shopping' | 'other';
@@ -51,7 +51,7 @@ export interface CreateExpenseData {
     payerId: string;
     date: Date | Timestamp;
     splitType: 'equal' | 'custom';
-    splits?: { userId: string; amount: number }[];
+    splits?: Record<string, number>;
     category?: Expense['category'];
     receiptImage?: string | null;
 }

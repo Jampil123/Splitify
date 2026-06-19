@@ -1,5 +1,6 @@
 import { DropdownMenu } from '@/components/common/DropdownMenu';
 import { db } from '@/services/firebase/config';
+import { usePresence } from '@/services/hooks/usePresence';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
 import { Group, GroupMember, Settlement } from '@/types';
@@ -21,7 +22,7 @@ import {
 } from 'react-native';
 
 // Member Avatar Component
-function MemberAvatar({ member, isCurrentUser }: { member: GroupMember; isCurrentUser: boolean }) {
+function MemberAvatar({ member, isCurrentUser, isOnline }: { member: GroupMember; isCurrentUser: boolean; isOnline?: boolean }) {
     return (
         <View style={styles.memberItem}>
             <View style={styles.memberAvatarContainer}>
@@ -34,7 +35,7 @@ function MemberAvatar({ member, isCurrentUser }: { member: GroupMember; isCurren
                         </Text>
                     </View>
                 )}
-                <View style={[styles.statusDot, { backgroundColor: '#4CAF50' }]} />
+                {isOnline && <View style={[styles.statusDot, { backgroundColor: '#4CAF50' }]} />}
             </View>
             <Text style={[typographyStyles.labelMedium, styles.memberName]}>
                 {isCurrentUser ? 'You' : member.fullName.split(' ')[0]}
@@ -122,10 +123,14 @@ export default function GroupDetailsScreen() {
                 const groupData = { id: groupSnap.id, ...groupSnap.data() } as Group;
                 setGroup(groupData);
                 
-                // Calculate current user's balance
+                // Calculate current user's balance; treat as 0 when group is fully settled
                 if (user?.id) {
-                    const currentMember = groupData.members.find(m => m.userId === user.id);
-                    setUserBalance(currentMember?.balance || 0);
+                    if (groupData.isFullySettled) {
+                        setUserBalance(0);
+                    } else {
+                        const currentMember = groupData.members.find(m => m.userId === user.id);
+                        setUserBalance(currentMember?.balance || 0);
+                    }
                 }
             } else {
                 Alert.alert('Error', 'Group not found');
@@ -165,6 +170,9 @@ export default function GroupDetailsScreen() {
     useEffect(() => {
         fetchGroupData();
     }, [fetchGroupData]);
+
+    const memberIds = group?.members.map(m => m.userId) ?? [];
+    const onlineMap = usePresence(memberIds);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -378,6 +386,7 @@ export default function GroupDetailsScreen() {
                                 key={member.userId}
                                 member={member}
                                 isCurrentUser={member.userId === user?.id}
+                                isOnline={onlineMap[member.userId] === true}
                             />
                         ))}
                         {group.members.length > 6 && (
@@ -427,67 +436,86 @@ export default function GroupDetailsScreen() {
                 </View>
 
                 {/* Suggested Settlements */}
-                {settlements.length > 0 && (
+                {(settlements.length > 0 || group.isFullySettled) && (
                     <View style={styles.settlementCard}>
                         <View style={styles.settlementHeader}>
-                            <Ionicons name="bulb" size={20} color={colors.primary} />
+                            <Ionicons
+                                name={group.isFullySettled && settlements.length === 0 ? 'checkmark-circle' : 'bulb'}
+                                size={20}
+                                color={group.isFullySettled && settlements.length === 0 ? '#10B981' : colors.primary}
+                            />
                             <Text style={[typographyStyles.headlineSmall, styles.settlementTitle]}>
                                 Suggested Settlements
                             </Text>
                         </View>
-                        {settlements.slice(0, 3).map(s => {
-                            const fromMember = group.members.find(m => m.userId === s.fromUserId);
-                            const toMember = group.members.find(m => m.userId === s.toUserId);
-                            const isUserPayer = s.fromUserId === user?.id;
-                            const isUserReceiver = s.toUserId === user?.id;
-                            return (
+
+                        {group.isFullySettled && settlements.length === 0 ? (
+                            <View style={styles.allSettledContainer}>
+                                <View style={styles.allSettledIconWrap}>
+                                    <Ionicons name="checkmark-circle" size={36} color="#10B981" />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.allSettledText}>All settled up!</Text>
+                                    <Text style={styles.allSettledSub}>Everyone is squared away in this group.</Text>
+                                </View>
+                            </View>
+                        ) : (
+                            <>
+                                {settlements.slice(0, 3).map(s => {
+                                    const fromMember = group.members.find(m => m.userId === s.fromUserId);
+                                    const toMember = group.members.find(m => m.userId === s.toUserId);
+                                    const isUserPayer = s.fromUserId === user?.id;
+                                    const isUserReceiver = s.toUserId === user?.id;
+                                    return (
+                                        <TouchableOpacity
+                                            key={s.id}
+                                            style={styles.settlementItem}
+                                            onPress={() => router.push({ pathname: '/groups/[id]/settlements', params: { id } })}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={styles.settlementAvatarRow}>
+                                                <View style={[styles.settlementAvatar, { overflow: 'hidden' }]}>
+                                                    {fromMember?.photoURL ? (
+                                                        <Image source={{ uri: fromMember.photoURL }} style={styles.settlementAvatarImg} />
+                                                    ) : (
+                                                        <Text style={styles.settlementAvatarText}>{s.fromUserName.charAt(0).toUpperCase()}</Text>
+                                                    )}
+                                                </View>
+                                                <Ionicons name="arrow-forward" size={12} color={colors.outline} style={{ marginHorizontal: 2 }} />
+                                                <View style={[styles.settlementAvatar, styles.settlementAvatarTo, { overflow: 'hidden' }]}>
+                                                    {toMember?.photoURL ? (
+                                                        <Image source={{ uri: toMember.photoURL }} style={styles.settlementAvatarImg} />
+                                                    ) : (
+                                                        <Text style={styles.settlementAvatarText}>{s.toUserName.charAt(0).toUpperCase()}</Text>
+                                                    )}
+                                                </View>
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={styles.settlementNames} numberOfLines={1}>
+                                                    {isUserPayer ? 'You' : s.fromUserName.split(' ')[0]}
+                                                    {' → '}
+                                                    {isUserReceiver ? 'You' : s.toUserName.split(' ')[0]}
+                                                </Text>
+                                                <Text style={[styles.settlementAmount, { color: isUserPayer ? colors.error : isUserReceiver ? '#10B981' : colors.onSurfaceVariant }]}>
+                                                    ₱{s.amount.toFixed(2)}
+                                                </Text>
+                                            </View>
+                                            <Ionicons name="chevron-forward" size={16} color={colors.outline} />
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                                {settlements.length > 3 && (
+                                    <Text style={styles.settlementMore}>+{settlements.length - 3} more settlements</Text>
+                                )}
                                 <TouchableOpacity
-                                    key={s.id}
-                                    style={styles.settlementItem}
+                                    style={styles.viewAllSettlementsBtn}
                                     onPress={() => router.push({ pathname: '/groups/[id]/settlements', params: { id } })}
-                                    activeOpacity={0.7}
                                 >
-                                    <View style={styles.settlementAvatarRow}>
-                                        <View style={[styles.settlementAvatar, { overflow: 'hidden' }]}>
-                                            {fromMember?.photoURL ? (
-                                                <Image source={{ uri: fromMember.photoURL }} style={styles.settlementAvatarImg} />
-                                            ) : (
-                                                <Text style={styles.settlementAvatarText}>{s.fromUserName.charAt(0).toUpperCase()}</Text>
-                                            )}
-                                        </View>
-                                        <Ionicons name="arrow-forward" size={12} color={colors.outline} style={{ marginHorizontal: 2 }} />
-                                        <View style={[styles.settlementAvatar, styles.settlementAvatarTo, { overflow: 'hidden' }]}>
-                                            {toMember?.photoURL ? (
-                                                <Image source={{ uri: toMember.photoURL }} style={styles.settlementAvatarImg} />
-                                            ) : (
-                                                <Text style={styles.settlementAvatarText}>{s.toUserName.charAt(0).toUpperCase()}</Text>
-                                            )}
-                                        </View>
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.settlementNames} numberOfLines={1}>
-                                            {isUserPayer ? 'You' : s.fromUserName.split(' ')[0]}
-                                            {' → '}
-                                            {isUserReceiver ? 'You' : s.toUserName.split(' ')[0]}
-                                        </Text>
-                                        <Text style={[styles.settlementAmount, { color: isUserPayer ? colors.error : isUserReceiver ? '#10B981' : colors.onSurfaceVariant }]}>
-                                            ₱{s.amount.toFixed(2)}
-                                        </Text>
-                                    </View>
-                                    <Ionicons name="chevron-forward" size={16} color={colors.outline} />
+                                    <Text style={styles.viewAllSettlementsBtnText}>View All Settlements</Text>
+                                    <Ionicons name="arrow-forward-outline" size={14} color={colors.primary} />
                                 </TouchableOpacity>
-                            );
-                        })}
-                        {settlements.length > 3 && (
-                            <Text style={styles.settlementMore}>+{settlements.length - 3} more settlements</Text>
+                            </>
                         )}
-                        <TouchableOpacity
-                            style={styles.viewAllSettlementsBtn}
-                            onPress={() => router.push({ pathname: '/groups/[id]/settlements', params: { id } })}
-                        >
-                            <Text style={styles.viewAllSettlementsBtnText}>View All Settlements</Text>
-                            <Ionicons name="arrow-forward-outline" size={14} color={colors.primary} />
-                        </TouchableOpacity>
                     </View>
                 )}
             </ScrollView>
@@ -924,5 +952,33 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: '600',
         fontFamily: 'Poppins_600SemiBold',
+    },
+    allSettledContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.md,
+        backgroundColor: '#F0FDF4',
+        padding: spacing.md,
+        borderRadius: spacing.borderRadiusLg,
+        borderWidth: 1,
+        borderColor: '#BBF7D0',
+    },
+    allSettledIconWrap: {
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    allSettledText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#059669',
+        fontFamily: 'Poppins_600SemiBold',
+    },
+    allSettledSub: {
+        fontSize: 12,
+        color: '#6B7280',
+        fontFamily: 'Poppins_400Regular',
+        marginTop: 2,
     },
 });

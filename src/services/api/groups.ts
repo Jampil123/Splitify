@@ -10,9 +10,84 @@ import {
   Timestamp,
   updateDoc
 } from '../firebase/config';
+import { onSnapshot } from 'firebase/firestore';
 
 import { CreateGroupData, Group, GroupMember, UpdateGroupData } from '@/types';
 import { getCurrentUserData, updateUserProfile } from '../firebase/auth';
+
+// ─── Real-time subscriptions ──────────────────────────────────────────────────
+
+/**
+ * Subscribe to a single group document.
+ * Fires immediately with current data and on every subsequent change.
+ */
+export function subscribeToGroup(
+    groupId: string,
+    callback: (group: Group | null) => void
+): () => void {
+    return onSnapshot(doc(db, 'groups', groupId), snap => {
+        callback(snap.exists() ? ({ id: snap.id, ...snap.data() } as Group) : null);
+    });
+}
+
+/**
+ * Subscribe to a user's group list.
+ * Watches the user document for groupId changes, then subscribes to each group
+ * document individually — fires on any membership or group-data change.
+ */
+export function subscribeToUserGroups(
+    userId: string,
+    callback: (groups: Group[]) => void
+): () => void {
+    const groupUnsubs = new Map<string, () => void>();
+    const groupData = new Map<string, Group>();
+
+    const notify = () => {
+        const sorted = Array.from(groupData.values())
+            .filter(g => g.isActive !== false)
+            .sort((a, b) => {
+                const ta = (a.createdAt as any)?.toMillis?.() ?? 0;
+                const tb = (b.createdAt as any)?.toMillis?.() ?? 0;
+                return tb - ta;
+            });
+        callback(sorted);
+    };
+
+    const userUnsub = onSnapshot(doc(db, 'users', userId), userSnap => {
+        const groupIds: string[] = userSnap.exists() ? (userSnap.data().groups ?? []) : [];
+
+        // Unsubscribe from groups no longer in the list
+        groupUnsubs.forEach((unsub, gId) => {
+            if (!groupIds.includes(gId)) {
+                unsub();
+                groupUnsubs.delete(gId);
+                groupData.delete(gId);
+            }
+        });
+
+        // Subscribe to newly added groups
+        groupIds.forEach(gId => {
+            if (!groupUnsubs.has(gId)) {
+                const unsub = onSnapshot(doc(db, 'groups', gId), groupSnap => {
+                    if (groupSnap.exists()) {
+                        groupData.set(gId, { id: groupSnap.id, ...groupSnap.data() } as Group);
+                    } else {
+                        groupData.delete(gId);
+                    }
+                    notify();
+                });
+                groupUnsubs.set(gId, unsub);
+            }
+        });
+
+        if (groupIds.length === 0) callback([]);
+    });
+
+    return () => {
+        userUnsub();
+        groupUnsubs.forEach(u => u());
+    };
+}
 
 // ============ Group CRUD Operations ============
 

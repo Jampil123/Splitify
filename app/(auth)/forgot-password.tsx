@@ -1,8 +1,9 @@
-﻿import { resetPassword } from '@/services/firebase/auth';
+import { resetPassword } from '@/services/firebase/auth';
 import { colors, spacing, typographyStyles } from '@/styles';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     KeyboardAvoidingView,
@@ -12,8 +13,10 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native';
+
+const RESEND_COOLDOWN = 60;
 
 export default function ForgotPasswordScreen() {
     const router = useRouter();
@@ -21,6 +24,30 @@ export default function ForgotPasswordScreen() {
     const [isLoading, setIsLoading] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
     const [error, setError] = useState('');
+    const [cooldown, setCooldown] = useState(0);
+    const [isResending, setIsResending] = useState(false);
+    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const inputRef = useRef<TextInput>(null);
+
+    useEffect(() => {
+        return () => {
+            if (timerRef.current) clearInterval(timerRef.current);
+        };
+    }, []);
+
+    const startCooldown = () => {
+        setCooldown(RESEND_COOLDOWN);
+        timerRef.current = setInterval(() => {
+            setCooldown(prev => {
+                if (prev <= 1) {
+                    clearInterval(timerRef.current!);
+                    timerRef.current = null;
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    };
 
     const handleResetPassword = async () => {
         if (!email.trim()) {
@@ -34,51 +61,103 @@ export default function ForgotPasswordScreen() {
 
         setIsLoading(true);
         setError('');
-        
+
         try {
             const result = await resetPassword(email);
             if (result.success) {
                 setIsSuccess(true);
+                startCooldown();
             } else {
                 setError(result.error || 'Failed to send reset email');
             }
-        } catch (error: any) {
-            setError(error.message || 'Something went wrong');
+        } catch (err: any) {
+            setError(err.message || 'Something went wrong');
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleBackToLogin = () => {
-        router.back();
+    const handleResend = async () => {
+        if (cooldown > 0 || isResending) return;
+        setIsResending(true);
+        try {
+            const result = await resetPassword(email);
+            if (result.success) {
+                startCooldown();
+            }
+        } finally {
+            setIsResending(false);
+        }
     };
 
+    const handleBackToLogin = () => router.back();
+
+    // ─── Success State ───────────────────────────────────────────────────────
     if (isSuccess) {
         return (
             <View style={styles.successContainer}>
                 <StatusBar style="dark" />
-                
-                {/* Background Atmospheric Effect */}
                 <View style={styles.blurTop} />
                 <View style={styles.blurBottom} />
-                
+
+                {/* Back button */}
+                <TouchableOpacity style={styles.successBack} onPress={handleBackToLogin} activeOpacity={0.7}>
+                    <Ionicons name="arrow-back-outline" size={20} color={colors.primary} />
+                </TouchableOpacity>
+
                 <View style={styles.successCard}>
-                    <View style={styles.successIconContainer}>
-                        <View style={styles.successIconCircle}>
-                            <Text style={styles.successIcon}>✓</Text>
-                        </View>
+                    {/* Icon */}
+                    <View style={styles.successIconCircle}>
+                        <Ionicons name="mail-open-outline" size={36} color={colors.onPrimary} />
                     </View>
+
                     <Text style={[typographyStyles.headlineMedium, styles.successTitle]}>
-                        Reset link sent!
+                        Check your inbox
                     </Text>
-                    <Text style={[typographyStyles.bodyLarge, styles.successMessage]}>
-                        Check your email for the password reset link
+                    <Text style={[typographyStyles.bodyMedium, styles.successMessage]}>
+                        We sent a password reset link to
                     </Text>
+                    <Text style={styles.successEmail}>{email}</Text>
+
+                    {/* Steps */}
+                    <View style={styles.stepsList}>
+                        {[
+                            { icon: 'mail-outline', text: 'Open the email we sent' },
+                            { icon: 'link-outline', text: 'Tap the reset link inside' },
+                            { icon: 'lock-closed-outline', text: 'Set your new password' },
+                        ].map((step, i) => (
+                            <View key={i} style={styles.stepRow}>
+                                <View style={styles.stepIconWrap}>
+                                    <Ionicons name={step.icon as any} size={16} color={colors.primary} />
+                                </View>
+                                <Text style={styles.stepText}>{step.text}</Text>
+                            </View>
+                        ))}
+                    </View>
+
+                    {/* Resend */}
+                    <View style={styles.resendRow}>
+                        <Text style={styles.resendLabel}>Didn't receive it?</Text>
+                        {cooldown > 0 ? (
+                            <Text style={styles.resendCooldown}>Resend in {cooldown}s</Text>
+                        ) : (
+                            <TouchableOpacity onPress={handleResend} disabled={isResending} activeOpacity={0.7}>
+                                {isResending ? (
+                                    <ActivityIndicator size="small" color={colors.primary} />
+                                ) : (
+                                    <Text style={styles.resendLink}>Resend email</Text>
+                                )}
+                            </TouchableOpacity>
+                        )}
+                    </View>
+
+                    {/* Back to login */}
                     <TouchableOpacity
                         style={styles.backToLoginButton}
                         onPress={handleBackToLogin}
                         activeOpacity={0.8}
                     >
+                        <Ionicons name="arrow-back-outline" size={18} color={colors.onPrimary} />
                         <Text style={[typographyStyles.buttonLarge, styles.backToLoginText]}>
                             Back to Login
                         </Text>
@@ -88,29 +167,22 @@ export default function ForgotPasswordScreen() {
         );
     }
 
+    // ─── Form State ──────────────────────────────────────────────────────────
     return (
         <KeyboardAvoidingView
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
             <StatusBar style="dark" />
-            
-            {/* Background Atmospheric Effect */}
             <View style={styles.blurTop} />
             <View style={styles.blurBottom} />
-            
+
             {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={handleBackToLogin}
-                    activeOpacity={0.7}
-                >
-                    <Text style={styles.backArrow}>←</Text>
+                <TouchableOpacity style={styles.backButton} onPress={handleBackToLogin} activeOpacity={0.7}>
+                    <Ionicons name="arrow-back-outline" size={22} color={colors.primary} />
                 </TouchableOpacity>
-                <Text style={[typographyStyles.headlineSmall, styles.logo]}>
-                    Splitify
-                </Text>
+                <Text style={[typographyStyles.headlineSmall, styles.logo]}>Splitify</Text>
                 <View style={styles.headerSpacer} />
             </View>
 
@@ -122,13 +194,13 @@ export default function ForgotPasswordScreen() {
                 {/* Icon and Title */}
                 <View style={styles.iconSection}>
                     <View style={styles.iconWrapper}>
-                        <Text style={styles.iconText}>📧</Text>
+                        <Ionicons name="lock-open-outline" size={40} color={colors.primary} />
                     </View>
                     <Text style={[typographyStyles.headlineMedium, styles.title]}>
                         Forgot Password?
                     </Text>
-                    <Text style={[typographyStyles.bodyLarge, styles.subtitle]}>
-                        Enter your email and we'll send you a reset link
+                    <Text style={[typographyStyles.bodyMedium, styles.subtitle]}>
+                        Enter your email and we'll send you a link to reset your password
                     </Text>
                 </View>
 
@@ -138,23 +210,34 @@ export default function ForgotPasswordScreen() {
                         <Text style={[typographyStyles.labelMedium, styles.label]}>
                             Email address
                         </Text>
-                        <TextInput
-                            style={[
-                                styles.input,
-                                error ? styles.inputError : null
-                            ]}
-                            placeholder="name@example.com"
-                            placeholderTextColor={colors.outline}
-                            value={email}
-                            onChangeText={(text) => {
-                                setEmail(text);
-                                setError('');
-                            }}
-                            autoCapitalize="none"
-                            keyboardType="email-address"
-                            editable={!isLoading}
-                        />
-                        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+                        <View style={[styles.inputWrapper, !!error && styles.inputWrapperError]}>
+                            <Ionicons
+                                name="mail-outline"
+                                size={20}
+                                color={error ? colors.error : colors.outline}
+                                style={styles.inputIcon}
+                            />
+                            <TextInput
+                                ref={inputRef}
+                                style={styles.input}
+                                placeholder="name@example.com"
+                                placeholderTextColor={colors.outline}
+                                value={email}
+                                onChangeText={text => { setEmail(text); setError(''); }}
+                                autoCapitalize="none"
+                                keyboardType="email-address"
+                                autoComplete="email"
+                                returnKeyType="send"
+                                onSubmitEditing={handleResetPassword}
+                                editable={!isLoading}
+                            />
+                        </View>
+                        {!!error && (
+                            <View style={styles.errorRow}>
+                                <Ionicons name="alert-circle-outline" size={14} color={colors.error} />
+                                <Text style={styles.errorText}>{error}</Text>
+                            </View>
+                        )}
                     </View>
 
                     <TouchableOpacity
@@ -166,16 +249,20 @@ export default function ForgotPasswordScreen() {
                         {isLoading ? (
                             <ActivityIndicator color={colors.onPrimary} />
                         ) : (
-                            <Text style={[typographyStyles.buttonLarge, styles.sendButtonText]}>
-                                Send Reset Link
-                            </Text>
+                            <>
+                                <Ionicons name="paper-plane-outline" size={18} color={colors.onPrimary} />
+                                <Text style={[typographyStyles.buttonLarge, styles.sendButtonText]}>
+                                    Send Reset Link
+                                </Text>
+                            </>
                         )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.backLink} onPress={handleBackToLogin} activeOpacity={0.7}>
+                        <Text style={styles.backLinkText}>Back to login</Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
-
-            {/* Footer Decorative Element */}
-            <View style={styles.footerDecoration} />
         </KeyboardAvoidingView>
     );
 }
@@ -191,7 +278,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.gutter,
         paddingBottom: spacing.xl,
     },
-    // Background blur effects
     blurTop: {
         position: 'absolute',
         top: -50,
@@ -212,13 +298,12 @@ const styles = StyleSheet.create({
         borderRadius: 999,
         opacity: 0.5,
     },
-    // Header styles
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: spacing.gutter,
-        paddingTop: spacing.xl,
+        paddingTop: spacing.xxl,
         paddingBottom: spacing.md,
     },
     backButton: {
@@ -228,10 +313,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: colors.surface,
-    },
-    backArrow: {
-        fontSize: 24,
-        color: colors.primaryContainer,
+        borderWidth: 1,
+        borderColor: colors.outlineVariant,
     },
     logo: {
         color: colors.primary,
@@ -240,22 +323,23 @@ const styles = StyleSheet.create({
     headerSpacer: {
         width: 40,
     },
-    // Icon section
     iconSection: {
         alignItems: 'center',
         marginBottom: spacing.xl,
     },
     iconWrapper: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: colors.primaryContainer + '10', // 10% opacity
+        width: 88,
+        height: 88,
+        borderRadius: 44,
+        backgroundColor: colors.primaryContainer,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: spacing.lg,
-    },
-    iconText: {
-        fontSize: 48,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 4,
     },
     title: {
         color: colors.onSurface,
@@ -266,12 +350,13 @@ const styles = StyleSheet.create({
         color: colors.onSurfaceVariant,
         textAlign: 'center',
         maxWidth: 280,
+        lineHeight: 22,
     },
-    // Card styles
     card: {
         backgroundColor: colors.secondaryContainer,
         borderRadius: spacing.borderRadiusLg,
         padding: spacing.lg,
+        gap: spacing.sm,
         shadowColor: colors.onSurface,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.05,
@@ -279,42 +364,58 @@ const styles = StyleSheet.create({
         elevation: 2,
     },
     inputGroup: {
-        marginBottom: spacing.lg,
+        gap: spacing.xs,
+        marginBottom: spacing.xs,
     },
     label: {
-        color: colors.onPrimaryFixedVariant,
-        marginBottom: spacing.xs,
+        color: colors.onSurfaceVariant,
         marginLeft: spacing.xs,
     },
-    input: {
+    inputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
         backgroundColor: colors.background,
         borderWidth: 1,
-        borderColor: colors.secondaryFixed,
+        borderColor: colors.outlineVariant,
         borderRadius: spacing.borderRadiusLg,
         paddingHorizontal: spacing.md,
+    },
+    inputWrapperError: {
+        borderColor: colors.error,
+        backgroundColor: colors.errorContainer + '20',
+    },
+    inputIcon: {
+        marginRight: spacing.sm,
+    },
+    input: {
+        flex: 1,
         paddingVertical: spacing.md,
-        fontSize: 16,
+        fontSize: 15,
         fontFamily: 'Poppins_400Regular',
         color: colors.onSurface,
     },
-    inputError: {
-        borderColor: colors.error,
+    errorRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        marginLeft: spacing.xs,
     },
     errorText: {
         fontSize: 12,
         color: colors.error,
-        marginTop: spacing.xs,
-        marginLeft: spacing.xs,
+        fontFamily: 'Poppins_400Regular',
     },
     sendButton: {
-        backgroundColor: colors.primaryContainer,
-        height: 50,
+        backgroundColor: colors.primary,
+        height: 52,
         borderRadius: spacing.borderRadiusFull,
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: spacing.sm,
         shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
+        shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 4,
     },
@@ -325,70 +426,144 @@ const styles = StyleSheet.create({
     disabledButton: {
         opacity: 0.6,
     },
-    footerDecoration: {
-        position: 'absolute',
-        bottom: 40,
-        left: 0,
-        right: 0,
+    backLink: {
         alignItems: 'center',
-        opacity: 0.1,
-        pointerEvents: 'none',
+        paddingVertical: spacing.xs,
     },
-    // Success state styles
+    backLinkText: {
+        fontSize: 13,
+        color: colors.onSurfaceVariant,
+        fontFamily: 'Poppins_400Regular',
+        textDecorationLine: 'underline',
+    },
+    // ─── Success State ───────────────────────────────────────────────────────
     successContainer: {
         flex: 1,
         backgroundColor: colors.background,
         justifyContent: 'center',
-        alignItems: 'center',
         paddingHorizontal: spacing.gutter,
+    },
+    successBack: {
+        position: 'absolute',
+        top: spacing.xxl,
+        left: spacing.gutter,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.outlineVariant,
     },
     successCard: {
         backgroundColor: colors.secondaryContainer,
         borderRadius: spacing.borderRadiusLg,
         padding: spacing.lg,
         alignItems: 'center',
-        width: '100%',
-        maxWidth: 400,
+        gap: spacing.sm,
         shadowColor: colors.onSurface,
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.08,
         shadowRadius: 12,
         elevation: 4,
-    },
-    successIconContainer: {
-        marginBottom: spacing.lg,
     },
     successIconCircle: {
         width: 80,
         height: 80,
         borderRadius: 40,
-        backgroundColor: '#4CAF50',
+        backgroundColor: colors.primary,
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    successIcon: {
-        fontSize: 40,
-        color: '#FFFFFF',
-        fontWeight: 'bold',
+        marginBottom: spacing.xs,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 5,
     },
     successTitle: {
         color: colors.onSurface,
-        marginBottom: spacing.sm,
         textAlign: 'center',
     },
     successMessage: {
         color: colors.onSurfaceVariant,
         textAlign: 'center',
-        marginBottom: spacing.xl,
-        paddingHorizontal: spacing.md,
+        marginTop: spacing.xs,
     },
-    backToLoginButton: {
+    successEmail: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: colors.primary,
+        fontFamily: 'Poppins_700Bold',
+        textAlign: 'center',
+        marginBottom: spacing.sm,
+    },
+    stepsList: {
+        alignSelf: 'stretch',
+        backgroundColor: colors.surfaceContainer,
+        borderRadius: spacing.borderRadiusMd,
+        padding: spacing.md,
+        gap: spacing.sm,
+        marginVertical: spacing.xs,
+    },
+    stepRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+    },
+    stepIconWrap: {
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         backgroundColor: colors.primaryContainer,
-        width: '100%',
-        height: 50,
-        borderRadius: spacing.borderRadiusFull,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    stepText: {
+        fontSize: 13,
+        color: colors.onSurface,
+        fontFamily: 'Poppins_400Regular',
+        flex: 1,
+    },
+    resendRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+        paddingVertical: spacing.xs,
+    },
+    resendLabel: {
+        fontSize: 13,
+        color: colors.onSurfaceVariant,
+        fontFamily: 'Poppins_400Regular',
+    },
+    resendLink: {
+        fontSize: 13,
+        color: colors.primary,
+        fontWeight: '600',
+        fontFamily: 'Poppins_600SemiBold',
+        textDecorationLine: 'underline',
+    },
+    resendCooldown: {
+        fontSize: 13,
+        color: colors.outline,
+        fontFamily: 'Poppins_400Regular',
+    },
+    backToLoginButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.sm,
+        backgroundColor: colors.primary,
+        alignSelf: 'stretch',
+        height: 52,
+        borderRadius: spacing.borderRadiusFull,
+        marginTop: spacing.xs,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 4,
     },
     backToLoginText: {
         color: colors.onPrimary,

@@ -336,6 +336,7 @@ export default function AllExpensesScreen() {
                         onPress={() => handleExpensePress(item.id)}
                     />
                 )}
+                style={styles.list}
                 contentContainerStyle={styles.listContent}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
@@ -492,9 +493,12 @@ const styles = StyleSheet.create({
     sortText: {
         color: colors.onSurfaceVariant,
     },
+    list: {
+        flex: 1,
+    },
     listContent: {
         paddingHorizontal: spacing.gutter,
-        paddingBottom: 120,
+        paddingBottom: spacing.md,
         gap: spacing.md,
         paddingTop: spacing.md,
     },
@@ -570,16 +574,12 @@ const styles = StyleSheet.create({
         color: colors.onPrimary,
     },
     footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: spacing.gutter,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surface + 'CC',
-    borderTopWidth: 1,
-    borderTopColor: colors.outlineVariant,
-    gap: spacing.md,
+        paddingHorizontal: spacing.gutter,
+        paddingVertical: spacing.md,
+        backgroundColor: colors.surface,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: colors.outlineVariant + '50',
+        gap: spacing.md,
     },
     footerTop: {
         flexDirection: 'row',

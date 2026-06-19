@@ -68,13 +68,13 @@ const getCategoryLabel = (category: string): string => {
 };
 
 // Split Breakdown Row Component
-function SplitRow({ member, amount, isPayer }: { member: any; amount: number; isPayer: boolean }) {
+function SplitRow({ member, amount, isPayer, paidTotal }: { member: any; amount: number; isPayer: boolean; paidTotal?: number }) {
     const getInitials = (name: string) => name.charAt(0).toUpperCase();
 
     return (
         <View style={styles.splitRow}>
             <View style={styles.splitRowLeft}>
-                <View style={[styles.splitAvatar, isPayer && styles.splitAvatarPayer]}>
+                <View style={[styles.splitAvatar, isPayer && styles.splitAvatarPayer, { overflow: 'hidden' }]}>
                     {member.photoURL ? (
                         <Image source={{ uri: member.photoURL }} style={styles.splitAvatarImage} />
                     ) : (
@@ -83,10 +83,10 @@ function SplitRow({ member, amount, isPayer }: { member: any; amount: number; is
                 </View>
                 <View>
                     <Text style={[typographyStyles.bodyMedium, styles.splitName]}>
-                        {member.fullName} {isPayer && '(You)'}
+                        {member.fullName}
                     </Text>
                     <Text style={[typographyStyles.bodySmall, styles.splitStatus]}>
-                        {isPayer ? `Paid ₱${amount.toFixed(2)}` : 'Owes payer'}
+                        {isPayer ? `Paid ₱${(paidTotal ?? amount).toFixed(2)}` : 'Owes share'}
                     </Text>
                 </View>
             </View>
@@ -208,7 +208,7 @@ export default function ExpenseDetailsScreen() {
 
     // Calculate split amounts
     const memberCount = groupMembers.length || 1;
-    const individualShare = expense.amount / memberCount;
+    const equalShare = expense.amount / memberCount;
 
     // Find payer details
     const payer = groupMembers.find((m: any) => m.userId === expense.payerId);
@@ -291,17 +291,42 @@ export default function ExpenseDetailsScreen() {
 
                 {/* Split Breakdown */}
                 <View style={styles.splitSection}>
-                    <Text style={[typographyStyles.headlineSmall, styles.sectionTitle]}>
-                        Split Breakdown
-                    </Text>
-                    {groupMembers.map((member: any) => (
-                        <SplitRow
-                            key={member.userId}
-                            member={member}
-                            amount={individualShare}
-                            isPayer={member.userId === expense.payerId}
-                        />
-                    ))}
+                    <View style={styles.splitSectionHeader}>
+                        <Text style={[typographyStyles.headlineSmall, styles.sectionTitle]}>
+                            Split Breakdown
+                        </Text>
+                        <View style={[styles.splitTypeBadge, expense.splitType === 'custom' && styles.splitTypeBadgeCustom]}>
+                            <Ionicons
+                                name={expense.splitType === 'custom' ? 'options-outline' : 'git-branch-outline'}
+                                size={11}
+                                color={expense.splitType === 'custom' ? colors.primary : colors.onSurfaceVariant}
+                            />
+                            <Text style={[styles.splitTypeBadgeText, expense.splitType === 'custom' && styles.splitTypeBadgeTextCustom]}>
+                                {expense.splitType === 'custom' ? 'Custom' : 'Equal'}
+                            </Text>
+                        </View>
+                    </View>
+                    {groupMembers.map((member: any) => {
+                        const isThisPayer = member.userId === expense.payerId;
+                        const splitsMap = expense.splits as Record<string, number> | null | undefined;
+                        const hasCustomSplits =
+                            expense.splitType === 'custom' &&
+                            splitsMap != null &&
+                            typeof splitsMap === 'object' &&
+                            Object.keys(splitsMap).length > 0;
+                        const memberShare = hasCustomSplits
+                            ? (splitsMap![member.userId] ?? equalShare)
+                            : equalShare;
+                        return (
+                            <SplitRow
+                                key={member.userId}
+                                member={member}
+                                amount={memberShare}
+                                isPayer={isThisPayer}
+                                paidTotal={isThisPayer ? expense.amount : undefined}
+                            />
+                        );
+                    })}
                 </View>
 
                 {/* Notes Section */}
@@ -478,9 +503,39 @@ const styles = StyleSheet.create({
     splitSection: {
         gap: spacing.sm,
     },
+    splitSectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: spacing.sm,
+    },
+    splitTypeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 4,
+        borderRadius: spacing.borderRadiusFull,
+        backgroundColor: colors.surfaceContainer,
+        borderWidth: 1,
+        borderColor: colors.outlineVariant,
+    },
+    splitTypeBadgeCustom: {
+        backgroundColor: colors.primaryContainer,
+        borderColor: colors.primary + '40',
+    },
+    splitTypeBadgeText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: colors.onSurfaceVariant,
+        fontFamily: 'Poppins_600SemiBold',
+    },
+    splitTypeBadgeTextCustom: {
+        color: colors.primary,
+    },
     sectionTitle: {
         color: colors.onSurface,
-        marginBottom: spacing.sm,
+        marginBottom: 0,
     },
     splitRow: {
         flexDirection: 'row',

@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Image,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -62,7 +63,9 @@ export default function AddExpenseScreen() {
 
     const [selectedPayer, setSelectedPayer] = useState<GroupMember | null>(null);
     const [showDateModal, setShowDateModal] = useState(false);
+    const [showPayerModal, setShowPayerModal] = useState(false);
     const [dateInputText, setDateInputText] = useState('');
+    const [customSplits, setCustomSplits] = useState<Record<string, string>>({});
 
     // Fetch group data
     useEffect(() => {
@@ -77,11 +80,15 @@ export default function AddExpenseScreen() {
                     const groupData = { id: groupSnap.id, ...groupSnap.data() } as Group;
                     setGroup(groupData);
                     
-                    // Set default payer as current user
+                    // Set default payer and inherit group's split type
                     const currentUser = groupData.members.find(m => m.userId === user?.id);
                     if (currentUser) {
                         setSelectedPayer(currentUser);
-                        setExpense(prev => ({ ...prev, payerId: currentUser.userId }));
+                        setExpense(prev => ({
+                            ...prev,
+                            payerId: currentUser.userId,
+                            splitType: groupData.splitType || 'equal',
+                        }));
                     }
                 } else {
                     Alert.alert('Error', 'Group not found');
@@ -97,6 +104,26 @@ export default function AddExpenseScreen() {
         
         fetchGroup();
     }, [groupId, user]);
+
+    // Computed split values (used in JSX and validation)
+    const splitAmountNum = parseFloat(expense.amount) || 0;
+    const totalAssigned = Object.values(customSplits).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
+    const remaining = splitAmountNum - totalAssigned;
+    const isCustomBalanced = Math.abs(remaining) < 0.01;
+
+    const distributeRemaining = () => {
+        if (!group || remaining <= 0.01) return;
+        const unset = group.members.filter(
+            m => !customSplits[m.userId] || parseFloat(customSplits[m.userId] || '0') === 0
+        );
+        if (unset.length === 0) return;
+        const share = remaining / unset.length;
+        setCustomSplits(prev => {
+            const next = { ...prev };
+            unset.forEach(m => { next[m.userId] = share.toFixed(2); });
+            return next;
+        });
+    };
 
     const handleAddExpense = async () => {
         // Validate
@@ -116,18 +143,32 @@ export default function AddExpenseScreen() {
             return;
         }
 
+        if (expense.splitType === 'custom') {
+            if (!isCustomBalanced) {
+                Alert.alert(
+                    'Split Error',
+                    remaining > 0
+                        ? `₱${remaining.toFixed(2)} still needs to be assigned`
+                        : `You've assigned ₱${Math.abs(remaining).toFixed(2)} over the total`
+                );
+                return;
+            }
+        }
+
         setIsSaving(true);
 
         try {
             const groupRef = doc(db, 'groups', groupId);
             const expensesRef = collection(db, 'groups', groupId, 'expenses');
-            
-            // Get payer name
+
             const payer = group?.members.find(m => m.userId === expense.payerId);
-            
-            // Calculate individual share
             const memberCount = group?.members.length || 1;
-            const individualShare = amountNum / memberCount;
+
+            const splits = expense.splitType === 'custom'
+                ? Object.fromEntries(
+                    (group?.members || []).map(m => [m.userId, parseFloat(customSplits[m.userId] || '0') || 0])
+                  )
+                : null;
 
             const newExpense = {
                 groupId,
@@ -138,8 +179,9 @@ export default function AddExpenseScreen() {
                 payerName: payer?.fullName || 'Unknown',
                 date: Timestamp.fromDate(expense.date),
                 createdAt: serverTimestamp(),
-                splitType: 'equal',
-                individualShare: individualShare,
+                splitType: expense.splitType,
+                individualShare: expense.splitType === 'equal' ? amountNum / memberCount : null,
+                splits,
                 category: expense.category,
                 receiptImage: null,
                 addedBy: user?.id,
@@ -197,19 +239,6 @@ export default function AddExpenseScreen() {
         });
     };
 
-    const showPayerSelector = () => {
-        if (!group) return;
-        
-        Alert.alert(
-            'Select Payer',
-            'Choose who paid for this expense',
-            group.members.map(member => ({
-                text: member.fullName + (member.userId === user?.id ? ' (You)' : ''),
-                onPress: () => selectPayer(member),
-            })),
-            { cancelable: true }
-        );
-    };
 
     if (isLoading) {
         return (
@@ -282,16 +311,21 @@ export default function AddExpenseScreen() {
                 {/* ✅ Payer - Full Width */}
                 <View style={styles.inputGroup}>
                     <Text style={[typographyStyles.labelMedium, styles.label]}>Paid by</Text>
-                    <TouchableOpacity style={styles.pickerButton} onPress={showPayerSelector}>
+                    <TouchableOpacity style={styles.pickerButton} onPress={() => setShowPayerModal(true)}>
                         <View style={styles.pickerLeft}>
-                            <View style={styles.payerAvatar}>
-                                <Text style={styles.payerAvatarText}>
-                                    {selectedPayer?.fullName?.charAt(0) || 'U'}
-                                </Text>
+                            <View style={[styles.payerAvatar, { overflow: 'hidden' }]}>
+                                {selectedPayer?.photoURL ? (
+                                    <Image source={{ uri: selectedPayer.photoURL }} style={styles.payerAvatarImg} />
+                                ) : (
+                                    <Text style={styles.payerAvatarText}>
+                                        {selectedPayer?.fullName?.charAt(0) || 'U'}
+                                    </Text>
+                                )}
                             </View>
                             <Text style={styles.pickerText} numberOfLines={1}>
-                                {selectedPayer?.fullName || 'Select payer'}
-                                {selectedPayer?.userId === user?.id && ' (You)'}
+                                {selectedPayer
+                                    ? (selectedPayer.userId === user?.id ? 'You' : selectedPayer.fullName)
+                                    : 'Select payer'}
                             </Text>
                         </View>
                         <Ionicons name="chevron-down-outline" size={20} color={colors.outline} />
@@ -349,40 +383,128 @@ export default function AddExpenseScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* Split Preview */}
+                {/* Split Section */}
                 <View style={styles.splitSection}>
-                    <View style={styles.splitHeader}>
-                        <Text style={[typographyStyles.labelMedium, styles.label]}>Split Type</Text>
-                        <TouchableOpacity>
-                            <Text style={[typographyStyles.labelMedium, styles.changeTypeText]}>Change Type</Text>
+                    <Text style={[typographyStyles.labelMedium, styles.label]}>Split</Text>
+
+                    {/* Type Toggle */}
+                    <View style={styles.splitToggle}>
+                        <TouchableOpacity
+                            style={[styles.splitToggleBtn, expense.splitType === 'equal' && styles.splitToggleBtnActive]}
+                            onPress={() => setExpense(prev => ({ ...prev, splitType: 'equal' }))}
+                        >
+                            <Ionicons name="git-branch-outline" size={14} color={expense.splitType === 'equal' ? colors.onPrimary : colors.onSurfaceVariant} />
+                            <Text style={[styles.splitToggleBtnText, expense.splitType === 'equal' && styles.splitToggleBtnTextActive]}>Equal</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.splitToggleBtn, expense.splitType === 'custom' && styles.splitToggleBtnActive]}
+                            onPress={() => setExpense(prev => ({ ...prev, splitType: 'custom' }))}
+                        >
+                            <Ionicons name="options-outline" size={14} color={expense.splitType === 'custom' ? colors.onPrimary : colors.onSurfaceVariant} />
+                            <Text style={[styles.splitToggleBtnText, expense.splitType === 'custom' && styles.splitToggleBtnTextActive]}>Custom</Text>
                         </TouchableOpacity>
                     </View>
 
                     <View style={styles.splitCard}>
-                        <View style={styles.splitCardHeader}>
-                            <Text style={[typographyStyles.bodySmall, styles.splitLabel]}>Split Equally</Text>
-                            <Ionicons name="information-circle-outline" size={20} color={colors.outline} />
-                        </View>
-                        {group?.members.map((member) => {
-                            const share = parseFloat(expense.amount) / (group.members.length || 1);
-                            return (
-                                <View key={member.userId} style={styles.splitRow}>
-                                    <View style={styles.splitMember}>
-                                        <View style={[styles.splitAvatar, { backgroundColor: member.userId === user?.id ? colors.primary : colors.secondary }]}>
-                                            <Text style={styles.splitAvatarText}>
-                                                {member.fullName.charAt(0)}
-                                            </Text>
-                                        </View>
-                                        <Text style={[typographyStyles.bodySmall, styles.splitName]} numberOfLines={1}>
-                                            {member.userId === user?.id ? 'You' : member.fullName.split(' ')[0]}
-                                        </Text>
-                                    </View>
-                                    <Text style={[typographyStyles.bodyMedium, styles.splitAmount]}>
-                                        ₱{isNaN(share) ? '0.00' : share.toFixed(2)}
+                        {/* Equal Split Preview */}
+                        {expense.splitType === 'equal' && (
+                            <>
+                                <View style={styles.splitCardHeader}>
+                                    <Text style={[typographyStyles.bodySmall, styles.splitLabel]}>Divided equally</Text>
+                                    <Text style={styles.splitLabelAmount}>
+                                        ₱{splitAmountNum > 0 ? (splitAmountNum / (group?.members.length || 1)).toFixed(2) : '0.00'} each
                                     </Text>
                                 </View>
-                            );
-                        })}
+                                {group?.members.map((member) => {
+                                    const share = splitAmountNum / (group.members.length || 1);
+                                    return (
+                                        <View key={member.userId} style={styles.splitRow}>
+                                            <View style={styles.splitMember}>
+                                                <View style={[styles.splitAvatar, { backgroundColor: member.userId === user?.id ? colors.primary : colors.secondary }]}>
+                                                    <Text style={styles.splitAvatarText}>{member.fullName.charAt(0)}</Text>
+                                                </View>
+                                                <Text style={[typographyStyles.bodySmall, styles.splitName]} numberOfLines={1}>
+                                                    {member.userId === user?.id ? 'You' : member.fullName.split(' ')[0]}
+                                                </Text>
+                                            </View>
+                                            <Text style={[typographyStyles.bodyMedium, styles.splitAmount]}>
+                                                ₱{isNaN(share) ? '0.00' : share.toFixed(2)}
+                                            </Text>
+                                        </View>
+                                    );
+                                })}
+                            </>
+                        )}
+
+                        {/* Custom Split */}
+                        {expense.splitType === 'custom' && (
+                            <>
+                                {group?.members.map((member) => (
+                                    <View key={member.userId} style={styles.splitRow}>
+                                        <View style={styles.splitMember}>
+                                            <View style={[styles.splitAvatar, { backgroundColor: member.userId === user?.id ? colors.primary : colors.secondary }]}>
+                                                <Text style={styles.splitAvatarText}>{member.fullName.charAt(0)}</Text>
+                                            </View>
+                                            <Text style={[typographyStyles.bodySmall, styles.splitName]} numberOfLines={1}>
+                                                {member.userId === user?.id ? 'You' : member.fullName.split(' ')[0]}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.customAmountWrapper}>
+                                            <Text style={styles.customAmountPrefix}>₱</Text>
+                                            <TextInput
+                                                style={styles.customAmountInput}
+                                                value={customSplits[member.userId] || ''}
+                                                onChangeText={v => setCustomSplits(prev => ({ ...prev, [member.userId]: v }))}
+                                                keyboardType="decimal-pad"
+                                                placeholder="0.00"
+                                                placeholderTextColor={colors.outline}
+                                            />
+                                        </View>
+                                    </View>
+                                ))}
+
+                                {/* Summary Bar */}
+                                <View style={[styles.splitSummaryBar, {
+                                    borderColor: isCustomBalanced ? '#10B981' : remaining < 0 ? colors.error : colors.outlineVariant,
+                                }]}>
+                                    <View style={styles.splitSummaryItem}>
+                                        <Text style={styles.splitSummaryLabel}>Assigned</Text>
+                                        <Text style={styles.splitSummaryValue}>₱{totalAssigned.toFixed(2)}</Text>
+                                    </View>
+                                    <View style={styles.splitSummaryDivider} />
+                                    <View style={styles.splitSummaryItem}>
+                                        <Text style={styles.splitSummaryLabel}>{remaining >= 0 ? 'Remaining' : 'Over by'}</Text>
+                                        <Text style={[styles.splitSummaryValue, {
+                                            color: isCustomBalanced ? '#10B981' : remaining < 0 ? colors.error : colors.onSurface,
+                                        }]}>
+                                            {isCustomBalanced ? '✓ Balanced' : `₱${Math.abs(remaining).toFixed(2)}`}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.splitSummaryDivider} />
+                                    <View style={styles.splitSummaryItem}>
+                                        <Text style={styles.splitSummaryLabel}>Total</Text>
+                                        <Text style={styles.splitSummaryValue}>₱{splitAmountNum.toFixed(2)}</Text>
+                                    </View>
+                                </View>
+
+                                {/* Distribute button */}
+                                {remaining > 0.01 && group?.members.some(m => !customSplits[m.userId] || parseFloat(customSplits[m.userId] || '0') === 0) && (
+                                    <TouchableOpacity style={styles.distributeBtn} onPress={distributeRemaining}>
+                                        <Ionicons name="share-outline" size={14} color={colors.primary} />
+                                        <Text style={styles.distributeBtnText}>Distribute ₱{remaining.toFixed(2)} equally</Text>
+                                    </TouchableOpacity>
+                                )}
+
+                                {/* Inline error */}
+                                {!isCustomBalanced && splitAmountNum > 0 && totalAssigned > 0 && (
+                                    <Text style={styles.splitErrorText}>
+                                        {remaining > 0
+                                            ? `₱${remaining.toFixed(2)} still needs to be assigned`
+                                            : `Over by ₱${Math.abs(remaining).toFixed(2)} — reduce some amounts`}
+                                    </Text>
+                                )}
+                            </>
+                        )}
                     </View>
                 </View>
 
@@ -421,6 +543,56 @@ export default function AddExpenseScreen() {
                     )}
                 </TouchableOpacity>
             </View>
+            {/* Payer Selection Modal */}
+            <Modal visible={showPayerModal} transparent animationType="slide" onRequestClose={() => setShowPayerModal(false)}>
+                <TouchableOpacity style={styles.payerModalOverlay} activeOpacity={1} onPress={() => setShowPayerModal(false)}>
+                    <TouchableOpacity style={styles.payerModalSheet} activeOpacity={1}>
+                        <View style={styles.payerModalHandle} />
+                        <View style={styles.payerModalHeader}>
+                            <Text style={styles.payerModalTitle}>Who paid?</Text>
+                            <TouchableOpacity style={styles.payerModalCloseBtn} onPress={() => setShowPayerModal(false)}>
+                                <Ionicons name="close" size={20} color={colors.onSurfaceVariant} />
+                            </TouchableOpacity>
+                        </View>
+                        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 360 }}>
+                            {group?.members.map(member => {
+                                const isSelected = expense.payerId === member.userId;
+                                const isCurrentUser = member.userId === user?.id;
+                                return (
+                                    <TouchableOpacity
+                                        key={member.userId}
+                                        style={[styles.payerModalMember, isSelected && styles.payerModalMemberSelected]}
+                                        onPress={() => { selectPayer(member); setShowPayerModal(false); }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={[styles.payerModalAvatar, { overflow: 'hidden' }]}>
+                                            {member.photoURL ? (
+                                                <Image source={{ uri: member.photoURL }} style={styles.payerModalAvatarImg} />
+                                            ) : (
+                                                <Text style={styles.payerModalAvatarText}>
+                                                    {member.fullName.charAt(0).toUpperCase()}
+                                                </Text>
+                                            )}
+                                        </View>
+                                        <View style={styles.payerModalMemberInfo}>
+                                            <Text style={[styles.payerModalMemberName, isSelected && styles.payerModalMemberNameSelected]}>
+                                                {isCurrentUser ? 'You' : member.fullName}
+                                            </Text>
+                                            {isCurrentUser && (
+                                                <Text style={styles.payerModalMemberSub}>{member.fullName}</Text>
+                                            )}
+                                        </View>
+                                        {isSelected && (
+                                            <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
+
             {/* Date Picker Modal */}
             <Modal visible={showDateModal} transparent animationType="fade" onRequestClose={() => setShowDateModal(false)}>
                 <TouchableOpacity style={styles.dateModalOverlay} activeOpacity={1} onPress={() => setShowDateModal(false)}>
@@ -615,13 +787,32 @@ const styles = StyleSheet.create({
     splitSection: {
         gap: spacing.sm,
     },
-    splitHeader: {
+    splitToggle: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        backgroundColor: colors.surfaceContainerLow,
+        borderRadius: spacing.borderRadiusFull,
+        padding: 4,
     },
-    changeTypeText: {
-        color: colors.primary,
+    splitToggleBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+        paddingVertical: spacing.sm,
+        borderRadius: spacing.borderRadiusFull,
+    },
+    splitToggleBtnActive: {
+        backgroundColor: colors.primary,
+    },
+    splitToggleBtnText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: colors.onSurfaceVariant,
+        fontFamily: 'Poppins_600SemiBold',
+    },
+    splitToggleBtnTextActive: {
+        color: colors.onPrimary,
     },
     splitCard: {
         backgroundColor: colors.surfaceContainer,
@@ -635,17 +826,23 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: spacing.sm,
     },
     splitLabel: {
         color: colors.onSurfaceVariant,
+    },
+    splitLabelAmount: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: colors.primary,
+        fontFamily: 'Poppins_600SemiBold',
     },
     splitRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         backgroundColor: colors.surface + '80',
-        padding: spacing.sm,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
         borderRadius: spacing.borderRadiusLg,
     },
     splitMember: {
@@ -674,6 +871,78 @@ const styles = StyleSheet.create({
     splitAmount: {
         color: colors.onSurface,
         fontWeight: '600',
+    },
+    customAmountWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.surfaceBright,
+        borderWidth: 1,
+        borderColor: colors.secondaryContainer,
+        borderRadius: spacing.borderRadiusMd,
+        paddingHorizontal: spacing.sm,
+    },
+    customAmountPrefix: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: colors.primary,
+        fontFamily: 'Poppins_600SemiBold',
+    },
+    customAmountInput: {
+        width: 80,
+        paddingVertical: spacing.xs,
+        fontSize: 14,
+        fontFamily: 'Poppins_400Regular',
+        color: colors.onSurface,
+        textAlign: 'right',
+    },
+    splitSummaryBar: {
+        flexDirection: 'row',
+        backgroundColor: colors.surfaceContainerLowest,
+        borderRadius: spacing.borderRadiusLg,
+        padding: spacing.md,
+        borderWidth: 1,
+        marginTop: spacing.xs,
+    },
+    splitSummaryItem: {
+        flex: 1,
+        alignItems: 'center',
+        gap: 2,
+    },
+    splitSummaryLabel: {
+        fontSize: 10,
+        color: colors.onSurfaceVariant,
+        fontFamily: 'Poppins_400Regular',
+    },
+    splitSummaryValue: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: colors.onSurface,
+        fontFamily: 'Poppins_700Bold',
+    },
+    splitSummaryDivider: {
+        width: 1,
+        backgroundColor: colors.outlineVariant,
+    },
+    distributeBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.xs,
+        backgroundColor: colors.primaryContainer,
+        paddingVertical: spacing.sm,
+        borderRadius: spacing.borderRadiusFull,
+    },
+    distributeBtnText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: colors.primary,
+        fontFamily: 'Poppins_600SemiBold',
+    },
+    splitErrorText: {
+        fontSize: 12,
+        color: colors.error,
+        textAlign: 'center',
+        fontFamily: 'Poppins_400Regular',
     },
     bottomContainer: {
         position: 'absolute',
@@ -763,5 +1032,100 @@ const styles = StyleSheet.create({
     },
     dateConfirmBtnText: {
         color: colors.onPrimary,
+    },
+    // Payer avatar image (in picker button)
+    payerAvatarImg: {
+        width: 32,
+        height: 32,
+    },
+    // Payer selection modal
+    payerModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    payerModalSheet: {
+        backgroundColor: colors.surface,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingHorizontal: spacing.gutter,
+        paddingTop: spacing.sm,
+        paddingBottom: spacing.xl,
+    },
+    payerModalHandle: {
+        width: 36,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: colors.outlineVariant,
+        alignSelf: 'center',
+        marginBottom: spacing.lg,
+    },
+    payerModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: spacing.lg,
+    },
+    payerModalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: colors.onSurface,
+        fontFamily: 'Poppins_700Bold',
+    },
+    payerModalCloseBtn: {
+        padding: spacing.xs,
+        borderRadius: spacing.borderRadiusFull,
+        backgroundColor: colors.surfaceContainer,
+    },
+    payerModalMember: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.md,
+        borderRadius: spacing.borderRadiusLg,
+        gap: spacing.md,
+        marginBottom: spacing.xs,
+        backgroundColor: colors.surfaceContainer,
+    },
+    payerModalMemberSelected: {
+        backgroundColor: colors.primaryContainer,
+        borderWidth: 1.5,
+        borderColor: colors.primary,
+    },
+    payerModalAvatar: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: colors.secondary,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+    },
+    payerModalAvatarImg: {
+        width: 48,
+        height: 48,
+    },
+    payerModalAvatarText: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: colors.onPrimary,
+    },
+    payerModalMemberInfo: {
+        flex: 1,
+        gap: 2,
+    },
+    payerModalMemberName: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: colors.onSurface,
+        fontFamily: 'Poppins_600SemiBold',
+    },
+    payerModalMemberNameSelected: {
+        color: colors.primary,
+    },
+    payerModalMemberSub: {
+        fontSize: 12,
+        color: colors.onSurfaceVariant,
+        fontFamily: 'Poppins_400Regular',
     },
 });

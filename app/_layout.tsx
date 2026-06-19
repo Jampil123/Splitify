@@ -1,16 +1,34 @@
+import { subscribeToConversations } from '@/services/api/chat';
 import { getCurrentUserData } from '@/services/firebase/auth';
 import { auth, onAuthStateChanged } from '@/services/firebase/config';
 import { initPresence } from '@/services/firebase/presence';
+import { ChatToast } from '@/components/notifications/ChatToast';
 import { useAuthStore } from '@/stores/authStore';
+import { useChatStore } from '@/stores/chatStore';
 import { colors } from '@/styles';
 import { Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold, Poppins_800ExtraBold, useFonts } from '@expo-google-fonts/poppins';
 import { Stack } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
+
+// Silence all console output in production builds
+if (!__DEV__) {
+    const noop = () => {};
+    console.log = noop;
+    console.warn = noop;
+    console.error = noop;
+    console.info = noop;
+    console.debug = noop;
+}
 
 export default function RootLayout() {
     const { setUser, setLoading, user, isLoading: authIsLoading } = useAuthStore();
+    const { setTotalUnread, showToast } = useChatStore();
     const [isAuthChecked, setIsAuthChecked] = useState(false);
+
+    // Track previous lastMessageAt per conversation to detect new messages
+    const prevLastAt = useRef<Record<string, number | null>>({});
+    const isFirstLoad = useRef(true);
 
     const [fontsLoaded] = useFonts({
         Poppins_400Regular,
@@ -24,6 +42,62 @@ export default function RootLayout() {
         if (!user?.id) return;
         const cleanup = initPresence(user.id);
         return cleanup;
+    }, [user?.id]);
+
+    // Subscribe to conversations: update unread badge + show toast on new messages
+    useEffect(() => {
+        if (!user?.id) return;
+
+        isFirstLoad.current = true;
+
+        const unsub = subscribeToConversations(user.id, conversations => {
+            // Total unread count across all conversations
+            const total = conversations.reduce(
+                (sum, conv) => sum + (conv.unreadCount?.[user.id!] ?? 0),
+                0
+            );
+            setTotalUnread(total);
+
+            if (isFirstLoad.current) {
+                // Seed baseline — don't toast for existing messages on app open
+                conversations.forEach(conv => {
+                    prevLastAt.current[conv.id] = conv.lastMessageAt
+                        ? (conv.lastMessageAt as any).toMillis?.() ?? null
+                        : null;
+                });
+                isFirstLoad.current = false;
+                return;
+            }
+
+            // Check each conversation for a newly received message
+            conversations.forEach(conv => {
+                const prevMs = prevLastAt.current[conv.id] ?? null;
+                const currMs = conv.lastMessageAt
+                    ? (conv.lastMessageAt as any).toMillis?.() ?? null
+                    : null;
+
+                const isNewMessage = currMs !== null && currMs !== prevMs;
+                const isFromFriend = conv.lastMessageBy && conv.lastMessageBy !== user.id;
+
+                if (isNewMessage && isFromFriend) {
+                    const friendId = conv.participants.find(p => p !== user.id) ?? '';
+                    showToast({
+                        senderName: conv.participantNames?.[conv.lastMessageBy!] ?? 'Someone',
+                        senderPhoto: conv.participantPhotos?.[conv.lastMessageBy!] ?? null,
+                        text: conv.lastMessage ?? '',
+                        friendId,
+                        friendName: conv.participantNames?.[friendId] ?? '',
+                    });
+                }
+
+                prevLastAt.current[conv.id] = currMs;
+            });
+        });
+
+        return () => {
+            unsub();
+            isFirstLoad.current = true;
+        };
     }, [user?.id]);
 
     useEffect(() => {
@@ -62,6 +136,7 @@ export default function RootLayout() {
     }
 
     return (
+        <View style={{ flex: 1 }}>
         <Stack
             screenOptions={{
                 headerStyle: {
@@ -214,7 +289,16 @@ export default function RootLayout() {
                     animation: 'slide_from_right',
                 }}
             />
+            <Stack.Screen
+                name="chat/[friendId]"
+                options={{
+                    headerShown: false,
+                    animation: 'slide_from_right',
+                }}
+            />
 
         </Stack>
+        <ChatToast />
+        </View>
     );
 }

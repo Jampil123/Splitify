@@ -12,9 +12,29 @@ import {
   updateDoc,
   where
 } from '../firebase/config';
+import { onSnapshot } from 'firebase/firestore';
 
 import { CreateExpenseData, Expense, ExpenseFilters, UpdateExpenseData } from '@/types';
 import { getGroup } from './groups';
+
+// ─── Real-time subscription ───────────────────────────────────────────────────
+
+/**
+ * Subscribe to a group's expenses collection, ordered by date descending.
+ * Fires immediately with current data and on every subsequent change.
+ */
+export function subscribeToGroupExpenses(
+    groupId: string,
+    callback: (expenses: Expense[]) => void
+): () => void {
+    const q = query(
+        collection(db, 'groups', groupId, 'expenses'),
+        orderBy('date', 'desc')
+    );
+    return onSnapshot(q, snap => {
+        callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as Expense)));
+    });
+}
 
 // ============ Helper to convert date to Timestamp ============
 function toFirestoreTimestamp(date: Date | Timestamp): Timestamp {

@@ -269,25 +269,34 @@ export default function CreateGroupScreen() {
                                 style={[styles.splitButton, splitType === 'equal' && styles.splitButtonActive]}
                                 onPress={() => setSplitType('equal')}
                             >
-                                <Text style={[
-                                    styles.splitButtonText,
-                                    splitType === 'equal' && styles.splitButtonTextActive
-                                ]}>
+                                <Ionicons
+                                    name="git-branch-outline"
+                                    size={14}
+                                    color={splitType === 'equal' ? colors.onPrimary : colors.onSurfaceVariant}
+                                />
+                                <Text style={[styles.splitButtonText, splitType === 'equal' && styles.splitButtonTextActive]}>
                                     Equal Split
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.splitButton, styles.splitButtonDisabled]}
-                                disabled
+                                style={[styles.splitButton, splitType === 'custom' && styles.splitButtonActive]}
+                                onPress={() => setSplitType('custom')}
                             >
-                                <Text style={styles.splitButtonTextDisabled}>
+                                <Ionicons
+                                    name="options-outline"
+                                    size={14}
+                                    color={splitType === 'custom' ? colors.onPrimary : colors.onSurfaceVariant}
+                                />
+                                <Text style={[styles.splitButtonText, splitType === 'custom' && styles.splitButtonTextActive]}>
                                     Custom Split
                                 </Text>
-                                <View style={styles.soonBadge}>
-                                    <Text style={styles.soonText}>SOON</Text>
-                                </View>
                             </TouchableOpacity>
                         </View>
+                        {splitType === 'custom' && (
+                            <Text style={styles.splitHint}>
+                                Each expense can have custom amounts set per member when adding expenses.
+                            </Text>
+                        )}
                     </View>
 
                     {/* Members Section */}
@@ -616,15 +625,15 @@ const styles = StyleSheet.create({
     },
     splitButton: {
         flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
         paddingVertical: spacing.md,
         borderRadius: spacing.borderRadiusFull,
-        alignItems: 'center',
     },
     splitButtonActive: {
         backgroundColor: colors.primary,
-    },
-    splitButtonDisabled: {
-        opacity: 0.4,
     },
     splitButtonText: {
         color: colors.onSurfaceVariant,
@@ -633,22 +642,12 @@ const styles = StyleSheet.create({
     splitButtonTextActive: {
         color: colors.onPrimary,
     },
-    splitButtonTextDisabled: {
+    splitHint: {
+        fontSize: 12,
         color: colors.onSurfaceVariant,
-    },
-    soonBadge: {
-        position: 'absolute',
-        right: spacing.md,
-        backgroundColor: colors.surfaceContainerHighest,
-        paddingHorizontal: spacing.xs,
-        paddingVertical: 2,
-        borderRadius: spacing.borderRadiusFull,
-        borderWidth: 1,
-        borderColor: colors.outlineVariant,
-    },
-    soonText: {
-        fontSize: 9,
-        color: colors.onSurfaceVariant,
+        fontFamily: 'Poppins_400Regular',
+        marginLeft: spacing.xs,
+        lineHeight: 18,
     },
     // Members Section
     membersSection: {

@@ -1,159 +1,141 @@
 import { CreateGroupData, Group, UpdateGroupData } from '@/types';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     addMemberToGroup,
     createGroup,
     deleteGroup,
-    getGroup,
-    getUserGroups,
     removeMemberFromGroup,
+    subscribeToGroup,
+    subscribeToUserGroups,
     updateGroup,
 } from '../api/groups';
 
+// ─── User's groups list (real-time) ──────────────────────────────────────────
+
 interface UseGroupsOptions {
-  autoFetch?: boolean;
+    autoFetch?: boolean;
 }
 
-export function useGroups(userId: string | undefined, options: UseGroupsOptions = { autoFetch: true }) {
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export function useGroups(userId: string | undefined, _options: UseGroupsOptions = {}) {
+    const [groups, setGroups] = useState<Group[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-  const fetchGroups = useCallback(async () => {
-    if (!userId) {
-      setGroups([]);
-      setIsLoading(false);
-      return;
-    }
+    useEffect(() => {
+        if (!userId) {
+            setGroups([]);
+            setIsLoading(false);
+            return;
+        }
 
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await getUserGroups(userId);
-      setGroups(data);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [userId]);
+        setIsLoading(true);
+        const unsub = subscribeToUserGroups(userId, data => {
+            setGroups(data);
+            setIsLoading(false);
+        });
 
-  const createNewGroup = useCallback(async (data: CreateGroupData): Promise<string | null> => {
-    if (!userId) return null;
-    try {
-      const groupId = await createGroup(data, userId);
-      if (groupId) {
-        await fetchGroups();
-      }
-      return groupId;
-    } catch (err: any) {
-      setError(err.message);
-      return null;
-    }
-  }, [userId, fetchGroups]);
+        return unsub;
+    }, [userId]);
 
-  const updateExistingGroup = useCallback(async (groupId: string, data: UpdateGroupData): Promise<boolean> => {
-    try {
-      const success = await updateGroup(groupId, data);
-      if (success) {
-        await fetchGroups();
-      }
-      return success;
-    } catch (err: any) {
-      setError(err.message);
-      return false;
-    }
-  }, [fetchGroups]);
+    // Mutations — no manual refetch needed; snapshot fires automatically
 
-  const removeGroup = useCallback(async (groupId: string): Promise<boolean> => {
-    try {
-      const success = await deleteGroup(groupId);
-      if (success) {
-        await fetchGroups();
-      }
-      return success;
-    } catch (err: any) {
-      setError(err.message);
-      return false;
-    }
-  }, [fetchGroups]);
+    const createNewGroup = useCallback(async (data: CreateGroupData): Promise<string | null> => {
+        if (!userId) return null;
+        try {
+            return await createGroup(data, userId);
+        } catch (err: any) {
+            setError(err.message);
+            return null;
+        }
+    }, [userId]);
 
-  const addMember = useCallback(async (
-    groupId: string,
-    userId: string,
-    fullName: string,
-    email: string,
-    photoURL?: string | null
-  ): Promise<boolean> => {
-    try {
-      return await addMemberToGroup(groupId, userId, fullName, email, photoURL);
-    } catch (err: any) {
-      setError(err.message);
-      return false;
-    }
-  }, []);
+    const updateExistingGroup = useCallback(async (groupId: string, data: UpdateGroupData): Promise<boolean> => {
+        try {
+            const ok = await updateGroup(groupId, data);
+            if (!ok) setError('Failed to update group');
+            return ok;
+        } catch (err: any) {
+            setError(err.message);
+            return false;
+        }
+    }, []);
 
-  const removeMember = useCallback(async (groupId: string, userId: string): Promise<boolean> => {
-    try {
-      return await removeMemberFromGroup(groupId, userId);
-    } catch (err: any) {
-      setError(err.message);
-      return false;
-    }
-  }, []);
+    const removeGroup = useCallback(async (groupId: string): Promise<boolean> => {
+        try {
+            const ok = await deleteGroup(groupId);
+            if (!ok) setError('Failed to delete group');
+            return ok;
+        } catch (err: any) {
+            setError(err.message);
+            return false;
+        }
+    }, []);
 
-  useEffect(() => {
-    if (options.autoFetch) {
-      fetchGroups();
-    }
-  }, [fetchGroups, options.autoFetch]);
+    const addMember = useCallback(async (
+        groupId: string,
+        memberId: string,
+        fullName: string,
+        email: string,
+        photoURL?: string | null
+    ): Promise<boolean> => {
+        try {
+            return await addMemberToGroup(groupId, memberId, fullName, email, photoURL);
+        } catch (err: any) {
+            setError(err.message);
+            return false;
+        }
+    }, []);
 
-  return {
-    groups,
-    isLoading,
-    error,
-    fetchGroups,
-    createNewGroup,
-    updateExistingGroup,
-    removeGroup,
-    addMember,
-    removeMember,
-  };
+    const removeMember = useCallback(async (groupId: string, memberId: string): Promise<boolean> => {
+        try {
+            return await removeMemberFromGroup(groupId, memberId);
+        } catch (err: any) {
+            setError(err.message);
+            return false;
+        }
+    }, []);
+
+    // fetchGroups kept for API compatibility — no-op since subscription is live
+    const fetchGroups = useCallback(() => Promise.resolve(), []);
+
+    return {
+        groups,
+        isLoading,
+        error,
+        fetchGroups,
+        createNewGroup,
+        updateExistingGroup,
+        removeGroup,
+        addMember,
+        removeMember,
+    };
 }
 
-// Hook for single group
+// ─── Single group (real-time) ─────────────────────────────────────────────────
+
 export function useGroup(groupId: string | undefined) {
-  const [group, setGroup] = useState<Group | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+    const [group, setGroup] = useState<Group | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-  const fetchGroup = useCallback(async () => {
-    if (!groupId) {
-      setGroup(null);
-      setIsLoading(false);
-      return;
-    }
+    useEffect(() => {
+        if (!groupId) {
+            setGroup(null);
+            setIsLoading(false);
+            return;
+        }
 
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await getGroup(groupId);
-      setGroup(data);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [groupId]);
+        setIsLoading(true);
+        const unsub = subscribeToGroup(groupId, data => {
+            setGroup(data);
+            setIsLoading(false);
+        });
 
-  useEffect(() => {
-    fetchGroup();
-  }, [fetchGroup]);
+        return unsub;
+    }, [groupId]);
 
-  return {
-    group,
-    isLoading,
-    error,
-    fetchGroup,
-  };
+    // fetchGroup kept for API compatibility — subscription keeps data live
+    const fetchGroup = useCallback(() => Promise.resolve(), []);
+
+    return { group, isLoading, error, fetchGroup };
 }

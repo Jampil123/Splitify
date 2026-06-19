@@ -1,4 +1,5 @@
-﻿import { colors, spacing } from '@/styles';
+﻿import { useChatStore } from '@/stores/chatStore';
+import { colors, spacing } from '@/styles';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -9,6 +10,8 @@ interface TabBarProps {
 }
 
 export function TabBar({ state, descriptors, navigation }: TabBarProps) {
+    const totalUnread = useChatStore(s => s.totalUnread);
+
     const getIconName = (routeName: string, isFocused: boolean) => {
         const iconMap: Record<string, { focused: string; unfocused: string }> = {
             'home/index': { focused: 'home', unfocused: 'home-outline' },
@@ -50,6 +53,8 @@ export function TabBar({ state, descriptors, navigation }: TabBarProps) {
                     }
                 };
 
+                const showBadge = route.name === 'friends/index' && totalUnread > 0;
+
                 return (
                     <TouchableOpacity
                         key={route.key}
@@ -57,11 +62,20 @@ export function TabBar({ state, descriptors, navigation }: TabBarProps) {
                         style={styles.tabItem}
                         activeOpacity={0.7}
                     >
-                        <Ionicons 
-                            name={iconName as any} 
-                            size={24} 
-                            color={isFocused ? colors.primary : colors.outline} 
-                        />
+                        <View style={styles.iconWrap}>
+                            <Ionicons
+                                name={iconName as any}
+                                size={24}
+                                color={isFocused ? colors.primary : colors.outline}
+                            />
+                            {showBadge && (
+                                <View style={styles.badge}>
+                                    <Text style={styles.badgeText}>
+                                        {totalUnread > 99 ? '99+' : totalUnread}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
                         <Text
                             style={[
                                 styles.label,
@@ -98,6 +112,30 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 4,
         paddingVertical: spacing.xs,
+    },
+    iconWrap: {
+        position: 'relative',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    badge: {
+        position: 'absolute',
+        top: -5,
+        right: -8,
+        backgroundColor: colors.error,
+        borderRadius: 9,
+        minWidth: 18,
+        height: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 4,
+        borderWidth: 2,
+        borderColor: colors.surfaceContainerLowest,
+    },
+    badgeText: {
+        fontSize: 9,
+        fontWeight: 'bold',
+        color: colors.onError,
     },
     label: {
         fontSize: 11,
