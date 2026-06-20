@@ -52,30 +52,29 @@ const getCategoryColor = (category: string): string => {
 // Expense Item Component
 function ExpenseItem({ expense, onPress }: { expense: Expense; onPress: () => void }) {
     const isPaidByUser = expense.payerId === expense.addedBy;
-    const isOwed = expense.payerId !== expense.addedBy && expense.individualShare;
 
     return (
         <TouchableOpacity style={styles.expenseItem} onPress={onPress} activeOpacity={0.7}>
-            <View style={styles.expenseLeft}>
-                <View style={[styles.expenseIcon, { backgroundColor: getCategoryColor(expense.category || 'other') + '20' }]}>
-                    <Ionicons name={getCategoryIcon(expense.category || 'other')} size={20} color={getCategoryColor(expense.category || 'other')} />
-                </View>
-                <View>
-                    <Text style={[typographyStyles.bodyMedium, styles.expenseTitle]}>{expense.title}</Text>
-                    <Text style={[typographyStyles.bodySmall, styles.expenseMeta]}>
-                        Paid by {expense.payerName} • {formatDate(expense.date, 'short')}
-                    </Text>
-                </View>
+            <View style={[styles.expenseIcon, { backgroundColor: getCategoryColor(expense.category || 'other') + '20' }]}>
+                <Ionicons name={getCategoryIcon(expense.category || 'other')} size={20} color={getCategoryColor(expense.category || 'other')} />
+            </View>
+            <View style={styles.expenseMiddle}>
+                <Text numberOfLines={1} style={[typographyStyles.bodyMedium, styles.expenseTitle]}>
+                    {expense.title}
+                </Text>
+                <Text numberOfLines={1} style={[typographyStyles.bodySmall, styles.expenseMeta]}>
+                    {expense.payerName} • {formatDate(expense.date, 'short')}
+                </Text>
             </View>
             <View style={styles.expenseRight}>
                 <Text style={[typographyStyles.bodyMedium, styles.expenseAmount]}>
                     ₱{expense.amount.toFixed(2)}
                 </Text>
-                <Text style={[
+                <Text numberOfLines={1} style={[
                     styles.expenseStatus,
                     isPaidByUser ? styles.statusPaid : styles.statusOwed,
                 ]}>
-                    {isPaidByUser ? 'You paid' : `You pay ₱${expense.individualShare?.toFixed(2) || '0.00'}`}
+                    {isPaidByUser ? 'You paid' : `₱${expense.individualShare?.toFixed(2) || '0.00'} owed`}
                 </Text>
             </View>
         </TouchableOpacity>
@@ -122,11 +121,10 @@ export default function AllExpensesScreen() {
                 orderBy('date', 'desc')
             );
             const expensesSnap = await getDocs(q);
-            const expensesData = expensesSnap.docs.map(doc => ({ 
-                id: doc.id, 
-                ...doc.data() 
-            }) as Expense);
-            
+            const expensesData = expensesSnap.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }) as Expense)
+                .filter(e => !e.isPayment);  // exclude settlement payment records
+
             setExpenses(expensesData);
             
             // Calculate totals
@@ -504,17 +502,11 @@ const styles = StyleSheet.create({
     },
     expenseItem: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
         backgroundColor: colors.secondaryContainer,
         padding: spacing.md,
         borderRadius: spacing.borderRadiusLg,
-    },
-    expenseLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
         gap: spacing.sm,
-        flex: 1,
     },
     expenseIcon: {
         width: 40,
@@ -522,6 +514,11 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
+        flexShrink: 0,
+    },
+    expenseMiddle: {
+        flex: 1,
+        minWidth: 0,
     },
     expenseTitle: {
         color: colors.onSurface,
@@ -532,6 +529,8 @@ const styles = StyleSheet.create({
     },
     expenseRight: {
         alignItems: 'flex-end',
+        flexShrink: 0,
+        minWidth: 80,
     },
     expenseAmount: {
         color: colors.onSurface,

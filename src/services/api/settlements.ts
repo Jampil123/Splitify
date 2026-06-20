@@ -126,17 +126,12 @@ export async function getUserSettlements(userId: string): Promise<Settlement[]> 
  */
 export async function markSettlementCompleted(
   groupId: string,
-  settlementId: string,
+  settlement: Settlement,
   data: Omit<MarkSettlementData, 'settlementId' | 'groupId'>
 ): Promise<boolean> {
   try {
-    const settlementRef = doc(db, 'groups', groupId, 'settlements', settlementId);
-    const settlement = await getDoc(settlementRef);
-    
-    if (!settlement.exists()) {
-      throw new Error('Settlement not found');
-    }
-    
+    const settlementRef = doc(db, 'groups', groupId, 'settlements', settlement.id);
+
     await updateDoc(settlementRef, {
       status: 'completed',
       completedAt: serverTimestamp(),
@@ -144,14 +139,45 @@ export async function markSettlementCompleted(
       transactionReference: data.transactionReference || null,
       note: data.note || null,
     });
-    
-    // Check if all settlements are now completed
-    const pendingSettlements = await getPendingSettlements(groupId);
-    if (pendingSettlements.length === 0) {
-      const groupRef = doc(db, 'groups', groupId);
-      await updateDoc(groupRef, { isFullySettled: true });
+
+    // Record the payment as a special expense entry so that refreshSettlementSuggestions
+    // permanently includes it in every future balance recalculation.
+    // - fromUser (debtor) paid → totalPaid increases → balance improves
+    // - toUser (creditor) gets the full amount as their custom "share" → credit is consumed
+    // - all other members have 0 share → unaffected
+    const groupSnap = await getDoc(doc(db, 'groups', groupId));
+    if (groupSnap.exists()) {
+      const groupData = groupSnap.data();
+      const members: any[] = groupData.members || [];
+
+      const splits: Record<string, number> = {};
+      members.forEach(m => {
+        splits[m.userId] = m.userId === settlement.toUserId ? settlement.amount : 0;
+      });
+
+      const paymentRef = doc(collection(db, 'groups', groupId, 'expenses'));
+      await setDoc(paymentRef, {
+        id: paymentRef.id,
+        groupId,
+        title: `Payment: ${settlement.fromUserName} → ${settlement.toUserName}`,
+        amount: settlement.amount,
+        payerId: settlement.fromUserId,
+        payerName: settlement.fromUserName,
+        splitType: 'custom',
+        splits,
+        category: 'other',
+        isPayment: true,
+        isDeleted: false,
+        date: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        addedBy: settlement.fromUserId,
+        addedByName: settlement.fromUserName,
+      });
     }
-    
+
+    // Recalculate all balances — the payment expense above zeroes out the settled debt
+    await refreshSettlementSuggestions(groupId);
+
     return true;
   } catch (error) {
     console.error('Error marking settlement completed:', error);

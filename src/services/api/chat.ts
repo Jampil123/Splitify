@@ -27,9 +27,10 @@ export async function getOrCreateConversation(
     const convId = getConversationId(currentUser.id, friend.id);
     const convRef = doc(db, 'conversations', convId);
 
-    await setDoc(
-        convRef,
-        {
+    const existing = await getDoc(convRef);
+    if (!existing.exists()) {
+        // Only write initial fields on creation — never overwrite lastMessage or unreadCount
+        await setDoc(convRef, {
             participants: [currentUser.id, friend.id],
             participantNames: {
                 [currentUser.id]: currentUser.fullName,
@@ -47,12 +48,12 @@ export async function getOrCreateConversation(
             lastMessageAt: null,
             lastMessageBy: null,
             createdAt: serverTimestamp(),
-        },
-        { merge: true }
-    );
+        });
+        const newSnap = await getDoc(convRef);
+        return { id: newSnap.id, ...newSnap.data() } as Conversation;
+    }
 
-    const snap = await getDoc(convRef);
-    return { id: snap.id, ...snap.data() } as Conversation;
+    return { id: existing.id, ...existing.data() } as Conversation;
 }
 
 export async function sendMessage(

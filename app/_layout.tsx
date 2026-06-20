@@ -103,13 +103,19 @@ export default function RootLayout() {
     useEffect(() => {
 
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-            
+
             if (firebaseUser) {
+                // Guard: if the stored user belongs to a different account, clear it
+                // immediately so stale data never renders while the fetch is in-flight
+                const stored = useAuthStore.getState().user;
+                if (stored && stored.id !== firebaseUser.uid) {
+                    setUser(null);
+                }
+
                 try {
                     const userData = await getCurrentUserData(firebaseUser.uid);
                     setUser(userData);
                 } catch (error) {
-                    console.error('Error fetching user data:', error);
                     setUser(null);
                 }
             } else {
@@ -284,13 +290,6 @@ export default function RootLayout() {
 
             <Stack.Screen
                 name="notifications/[notificationId]"
-                options={{
-                    headerShown: false,
-                    animation: 'slide_from_right',
-                }}
-            />
-            <Stack.Screen
-                name="chat/[friendId]"
                 options={{
                     headerShown: false,
                     animation: 'slide_from_right',

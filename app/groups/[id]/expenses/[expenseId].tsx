@@ -6,8 +6,8 @@ import { Expense } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
-import { useCallback, useEffect, useState } from 'react';
+import { deleteDoc, doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -107,44 +107,43 @@ export default function ExpenseDetailsScreen() {
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
-    const fetchExpense = useCallback(async () => {
-        if (!groupId || !expenseId) return;
-        
-        try {
-            const expenseRef = doc(db, 'groups', groupId, 'expenses', expenseId);
-            const expenseSnap = await getDoc(expenseRef);
-            
-            if (expenseSnap.exists()) {
-                const expenseData = { id: expenseSnap.id, ...expenseSnap.data() } as Expense;
-                setExpense(expenseData);
-                
-                // Fetch group members for split breakdown
-                const groupRef = doc(db, 'groups', groupId);
-                const groupSnap = await getDoc(groupRef);
-                if (groupSnap.exists()) {
-                    const groupData = groupSnap.data();
-                    setGroupMembers(groupData.members || []);
-                }
-            } else {
-                Alert.alert('Error', 'Expense not found');
-                router.back();
-            }
-        } catch (error) {
-            console.error('Error fetching expense:', error);
-            Alert.alert('Error', 'Failed to load expense details');
-        } finally {
-            setIsLoading(false);
-            setRefreshing(false);
-        }
-    }, [groupId, expenseId]);
+    const membersLoaded = useRef(false);
 
     useEffect(() => {
-        fetchExpense();
-    }, [fetchExpense]);
+        if (!groupId || !expenseId) return;
+        setIsLoading(true);
+
+        const expenseRef = doc(db, 'groups', groupId, 'expenses', expenseId);
+        const unsub = onSnapshot(expenseRef, async (snap) => {
+            if (!snap.exists()) {
+                Alert.alert('Error', 'Expense not found');
+                router.back();
+                return;
+            }
+            setExpense({ id: snap.id, ...snap.data() } as Expense);
+
+            if (!membersLoaded.current) {
+                membersLoaded.current = true;
+                const groupSnap = await getDoc(doc(db, 'groups', groupId));
+                if (groupSnap.exists()) {
+                    setGroupMembers(groupSnap.data().members || []);
+                }
+            }
+
+            setIsLoading(false);
+            setRefreshing(false);
+        }, (error) => {
+            console.error('Error subscribing to expense:', error);
+            Alert.alert('Error', 'Failed to load expense details');
+            setIsLoading(false);
+        });
+
+        return unsub;
+    }, [groupId, expenseId]);
 
     const onRefresh = () => {
         setRefreshing(true);
-        fetchExpense();
+        setTimeout(() => setRefreshing(false), 800);
     };
 
     const handleDelete = () => {

@@ -11,6 +11,7 @@ export default function TabLayout() {
         >
             <Tabs.Screen name="home/index" options={{ title: 'Home' }} />
             <Tabs.Screen name="friends/index" options={{ title: 'Friends' }} />
+            <Tabs.Screen name="chat" options={{ title: 'Messages' }} />
             <Tabs.Screen name="notifications/index" options={{ title: 'Alerts' }} />
             <Tabs.Screen name="profile/index" options={{ title: 'Profile' }} />
             

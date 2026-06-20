@@ -41,6 +41,10 @@ export interface Expense {
     // Status
     isDeleted: boolean;
     deletedAt?: Timestamp | null;
+
+    // Set to true for settlement payment records — excluded from expense list UI
+    // but included in balance calculations via refreshSettlementSuggestions
+    isPayment?: boolean;
 }
 
 // ✅ CreateExpenseData - for creating new expenses

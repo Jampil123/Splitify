@@ -121,6 +121,7 @@ export default function BalancesScreen() {
             setTotalExpenses(groupData.totalExpenses || 0);
 
             const memberCount = groupData.members.length;
+            // individualShare is displayed as a "per-person equal share" stat only
             const share = memberCount > 0 ? (groupData.totalExpenses || 0) / memberCount : 0;
             setIndividualShare(share);
 
@@ -128,13 +129,15 @@ export default function BalancesScreen() {
             groupData.members.forEach(m => { photoMap[m.userId] = m.photoURL || null; });
             setMemberPhotoMap(photoMap);
 
+            // Use stored balance fields set by refreshSettlementSuggestions —
+            // these correctly account for custom splits unlike a local recalculation.
             const userBalances: MemberBalance[] = groupData.members.map(m => ({
                 userId: m.userId,
                 userName: m.fullName,
                 photoURL: m.photoURL || null,
                 totalPaid: m.totalPaid || 0,
-                totalShare: share,
-                balance: (m.totalPaid || 0) - share,
+                totalShare: m.totalShare || 0,
+                balance: groupData.isFullySettled ? 0 : (m.balance || 0),
             }));
             setBalances(userBalances);
             setUserBalance(userBalances.find(b => b.userId === user?.id)?.balance || 0);

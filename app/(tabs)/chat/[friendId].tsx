@@ -4,6 +4,7 @@ import {
     sendMessage,
     subscribeToMessages,
 } from '@/services/api/chat';
+import { getCurrentUserData } from '@/services/firebase/auth';
 import { usePresence } from '@/services/hooks/usePresence';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing } from '@/styles';
@@ -53,7 +54,6 @@ type FlatItem =
 function buildFlatItems(messages: Message[]): FlatItem[] {
     const items: FlatItem[] = [];
     let lastDay = '';
-
     messages.forEach((msg, i) => {
         const dayLabel = getDayLabel(msg.createdAt);
         if (dayLabel !== lastDay) {
@@ -64,7 +64,6 @@ function buildFlatItems(messages: Message[]): FlatItem[] {
         const isLastInRun = !nextMsg || nextMsg.senderId !== msg.senderId;
         items.push({ kind: 'message', message: msg, isLastInRun });
     });
-
     return items;
 }
 
@@ -98,7 +97,6 @@ function Bubble({
                     ) : null}
                 </View>
             )}
-
             <View style={[styles.bubbleWrap, isOwn ? styles.bubbleWrapOwn : styles.bubbleWrapFriend]}>
                 <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleFriend]}>
                     <Text style={[styles.bubbleText, isOwn ? styles.bubbleTextOwn : styles.bubbleTextFriend]}>
@@ -143,6 +141,10 @@ export default function ChatScreen() {
     const [inputText, setInputText] = useState('');
     const [isSending, setIsSending] = useState(false);
     const [isInitializing, setIsInitializing] = useState(true);
+    const [friendProfile, setFriendProfile] = useState<{ name: string; photo: string | null }>({
+        name: friendName || 'Friend',
+        photo: friendPhoto || null,
+    });
 
     const flatListRef = useRef<FlatList>(null);
 
@@ -153,10 +155,18 @@ export default function ChatScreen() {
         flatListRef.current?.scrollToEnd({ animated });
     }, []);
 
-    // Initialize conversation
+    // Fetch fresh profile so photo always reflects current Firestore data
+    useEffect(() => {
+        if (!friendId) return;
+        getCurrentUserData(friendId).then(data => {
+            if (data) {
+                setFriendProfile({ name: data.fullName || friendName || 'Friend', photo: data.photoURL || null });
+            }
+        });
+    }, [friendId]);
+
     useEffect(() => {
         if (!user || !friendId) return;
-
         const init = async () => {
             const conv = await getOrCreateConversation(
                 { id: user.id, fullName: user.fullName, photoURL: user.photoURL },
@@ -165,11 +175,9 @@ export default function ChatScreen() {
             setConversation(conv);
             setIsInitializing(false);
         };
-
         init();
     }, [user, friendId, friendName, friendPhoto]);
 
-    // Subscribe to messages once conversation is ready
     useEffect(() => {
         if (!conversation) return;
         const unsub = subscribeToMessages(conversation.id, msgs => {
@@ -178,7 +186,6 @@ export default function ChatScreen() {
         return unsub;
     }, [conversation?.id]);
 
-    // Scroll to bottom and mark read when messages arrive
     useEffect(() => {
         if (messages.length === 0) return;
         scrollToBottom(messages.length > 1);
@@ -192,7 +199,6 @@ export default function ChatScreen() {
     const handleSend = async () => {
         const text = inputText.trim();
         if (!text || !conversation || !user || isSending) return;
-
         setInputText('');
         setIsSending(true);
         try {
@@ -209,22 +215,20 @@ export default function ChatScreen() {
     };
 
     const renderItem = useCallback(({ item }: { item: FlatItem }) => {
-        if (item.kind === 'separator') {
-            return <DaySeparator label={item.label} />;
-        }
+        if (item.kind === 'separator') return <DaySeparator label={item.label} />;
         return (
             <Bubble
                 message={item.message}
                 isOwn={item.message.senderId === user?.id}
                 isLastInRun={item.isLastInRun}
-                friendPhoto={friendPhoto || null}
+                friendPhoto={friendProfile.photo}
             />
         );
     }, [user?.id, friendPhoto]);
 
-    const keyExtractor = useCallback((item: FlatItem) => {
-        return item.kind === 'separator' ? item.id : item.message.id;
-    }, []);
+    const keyExtractor = useCallback((item: FlatItem) =>
+        item.kind === 'separator' ? item.id : item.message.id,
+    []);
 
     if (isInitializing) {
         return (
@@ -248,28 +252,26 @@ export default function ChatScreen() {
                     <Ionicons name="arrow-back-outline" size={24} color={colors.primary} />
                 </TouchableOpacity>
 
-                <View style={styles.headerCenter}>
+                <View style={styles.headerContent}>
                     <View style={styles.headerAvatarWrap}>
-                        {friendPhoto ? (
-                            <Image source={{ uri: friendPhoto }} style={styles.headerAvatar} />
+                        {friendProfile.photo ? (
+                            <Image source={{ uri: friendProfile.photo }} style={styles.headerAvatar} />
                         ) : (
                             <Text style={styles.headerAvatarText}>
-                                {(friendName || 'F').charAt(0).toUpperCase()}
+                                {friendProfile.name.charAt(0).toUpperCase()}
                             </Text>
                         )}
                         {isOnline && <View style={styles.headerOnlineDot} />}
                     </View>
-                    <View>
+                    <View style={styles.headerNameWrap}>
                         <Text style={styles.headerName} numberOfLines={1}>
-                            {friendName || 'Chat'}
+                            {friendProfile.name}
                         </Text>
                         <Text style={[styles.headerStatus, isOnline && styles.headerStatusOnline]}>
                             {isOnline ? 'Online' : 'Offline'}
                         </Text>
                     </View>
                 </View>
-
-                <View style={{ width: 40 }} />
             </View>
 
             {/* Message list */}
@@ -286,7 +288,7 @@ export default function ChatScreen() {
                     <View style={styles.emptyChat}>
                         <Ionicons name="chatbubbles-outline" size={48} color={colors.outline} />
                         <Text style={styles.emptyChatText}>
-                            Say hi to {friendName?.split(' ')[0] || 'your friend'}!
+                            Say hi to {friendProfile.name.split(' ')[0]}!
                         </Text>
                     </View>
                 }
@@ -298,7 +300,7 @@ export default function ChatScreen() {
                     style={styles.input}
                     value={inputText}
                     onChangeText={setInputText}
-                    placeholder={`Message ${friendName?.split(' ')[0] || ''}...`}
+                    placeholder={`Message ${friendProfile.name.split(' ')[0]}...`}
                     placeholderTextColor={colors.outline}
                     multiline
                     maxLength={1000}
@@ -325,42 +327,28 @@ export default function ChatScreen() {
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: colors.background,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: colors.background,
-    },
+    container: { flex: 1, backgroundColor: colors.background },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
 
-    // Header
     header: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
         paddingHorizontal: spacing.gutter,
         paddingTop: spacing.xxl,
         paddingBottom: spacing.md,
+        gap: spacing.sm,
         backgroundColor: colors.surface,
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: colors.outlineVariant + '50',
     },
-    backBtn: {
-        width: 40,
-        height: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    headerCenter: {
+    backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+    headerContent: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.sm,
-        justifyContent: 'center',
     },
+    headerNameWrap: { flex: 1 },
     headerAvatarWrap: {
         width: 40,
         height: 40,
@@ -370,15 +358,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    headerAvatar: {
-        width: 40,
-        height: 40,
-    },
-    headerAvatarText: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: colors.primary,
-    },
+    headerAvatar: { width: 40, height: 40 },
+    headerAvatarText: { fontSize: 16, fontWeight: 'bold', color: colors.primary },
     headerOnlineDot: {
         position: 'absolute',
         bottom: 1,
@@ -390,30 +371,16 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         borderColor: colors.surface,
     },
-    headerName: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: colors.onSurface,
-        fontFamily: 'Poppins_700Bold',
-    },
-    headerStatus: {
-        fontSize: 11,
-        color: colors.outline,
-        fontFamily: 'Poppins_400Regular',
-    },
-    headerStatusOnline: {
-        color: '#22C55E',
-    },
+    headerName: { fontSize: 15, fontWeight: '700', color: colors.onSurface, fontFamily: 'Poppins_700Bold' },
+    headerStatus: { fontSize: 11, color: colors.outline, fontFamily: 'Poppins_400Regular' },
+    headerStatusOnline: { color: '#22C55E' },
 
-    // Message list — grows to fill space, messages start at top
     messageList: {
         paddingHorizontal: spacing.gutter,
         paddingTop: spacing.md,
         paddingBottom: spacing.sm,
         flexGrow: 1,
     },
-
-    // Empty state
     emptyChat: {
         flex: 1,
         alignItems: 'center',
@@ -421,118 +388,37 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.xl * 3,
         gap: spacing.md,
     },
-    emptyChatText: {
-        fontSize: 14,
-        color: colors.onSurfaceVariant,
-        fontFamily: 'Poppins_400Regular',
-    },
+    emptyChatText: { fontSize: 14, color: colors.onSurfaceVariant, fontFamily: 'Poppins_400Regular' },
 
-    // Day separator
-    daySep: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.sm,
-        marginVertical: spacing.md,
-    },
-    daySepLine: {
-        flex: 1,
-        height: StyleSheet.hairlineWidth,
-        backgroundColor: colors.outlineVariant,
-    },
-    daySepText: {
-        fontSize: 11,
-        color: colors.outline,
-        fontFamily: 'Poppins_400Regular',
-    },
+    daySep: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginVertical: spacing.md },
+    daySepLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.outlineVariant },
+    daySepText: { fontSize: 11, color: colors.outline, fontFamily: 'Poppins_400Regular' },
 
-    // Bubble row
-    bubbleRow: {
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        marginBottom: 2,
-    },
-    bubbleRowOwn: {
-        justifyContent: 'flex-end',
-    },
-    bubbleRowFriend: {
-        justifyContent: 'flex-start',
-    },
+    bubbleRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 2 },
+    bubbleRowOwn: { justifyContent: 'flex-end' },
+    bubbleRowFriend: { justifyContent: 'flex-start' },
 
-    // Avatar next to friend's bubble
-    bubbleAvatarSlot: {
-        width: 28,
-        height: 28,
-        marginRight: spacing.xs,
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-    },
+    bubbleAvatarSlot: { width: 28, height: 28, marginRight: spacing.xs, alignItems: 'center', justifyContent: 'flex-end' },
     bubbleAvatar: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        overflow: 'hidden',
-        backgroundColor: colors.primaryContainer,
-        alignItems: 'center',
-        justifyContent: 'center',
+        width: 28, height: 28, borderRadius: 14, overflow: 'hidden',
+        backgroundColor: colors.primaryContainer, alignItems: 'center', justifyContent: 'center',
     },
-    bubbleAvatarImg: {
-        width: 28,
-        height: 28,
-    },
-    bubbleAvatarText: {
-        fontSize: 11,
-        fontWeight: 'bold',
-        color: colors.primary,
-    },
+    bubbleAvatarImg: { width: 28, height: 28 },
+    bubbleAvatarText: { fontSize: 11, fontWeight: 'bold', color: colors.primary },
 
-    // Bubble content
-    bubbleWrap: {
-        maxWidth: '75%',
-    },
-    bubbleWrapOwn: {
-        alignItems: 'flex-end',
-    },
-    bubbleWrapFriend: {
-        alignItems: 'flex-start',
-    },
-    bubble: {
-        paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        borderRadius: 18,
-    },
-    bubbleOwn: {
-        backgroundColor: colors.primary,
-        borderBottomRightRadius: 4,
-    },
-    bubbleFriend: {
-        backgroundColor: colors.surfaceContainer,
-        borderBottomLeftRadius: 4,
-    },
-    bubbleText: {
-        fontSize: 14,
-        lineHeight: 20,
-        fontFamily: 'Poppins_400Regular',
-    },
-    bubbleTextOwn: {
-        color: colors.onPrimary,
-    },
-    bubbleTextFriend: {
-        color: colors.onSurface,
-    },
-    bubbleTime: {
-        fontSize: 10,
-        marginTop: 2,
-        fontFamily: 'Poppins_400Regular',
-        color: colors.outline,
-    },
-    bubbleTimeOwn: {
-        textAlign: 'right',
-    },
-    bubbleTimeFriend: {
-        textAlign: 'left',
-    },
+    bubbleWrap: { maxWidth: '75%' },
+    bubbleWrapOwn: { alignItems: 'flex-end' },
+    bubbleWrapFriend: { alignItems: 'flex-start' },
+    bubble: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: 18 },
+    bubbleOwn: { backgroundColor: colors.primary, borderBottomRightRadius: 4 },
+    bubbleFriend: { backgroundColor: colors.surfaceContainer, borderBottomLeftRadius: 4 },
+    bubbleText: { fontSize: 14, lineHeight: 20, fontFamily: 'Poppins_400Regular' },
+    bubbleTextOwn: { color: colors.onPrimary },
+    bubbleTextFriend: { color: colors.onSurface },
+    bubbleTime: { fontSize: 10, marginTop: 2, fontFamily: 'Poppins_400Regular', color: colors.outline },
+    bubbleTimeOwn: { textAlign: 'right' },
+    bubbleTimeFriend: { textAlign: 'left' },
 
-    // Input bar
     inputBar: {
         flexDirection: 'row',
         alignItems: 'flex-end',
@@ -560,21 +446,11 @@ const styles = StyleSheet.create({
         textAlignVertical: 'center',
     },
     sendBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        width: 44, height: 44, borderRadius: 22,
         backgroundColor: colors.primary,
-        alignItems: 'center',
-        justifyContent: 'center',
-        shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 3,
+        alignItems: 'center', justifyContent: 'center',
+        shadowColor: colors.primary, shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25, shadowRadius: 4, elevation: 3,
     },
-    sendBtnDisabled: {
-        backgroundColor: colors.outline,
-        shadowOpacity: 0,
-        elevation: 0,
-    },
+    sendBtnDisabled: { backgroundColor: colors.outline, shadowOpacity: 0, elevation: 0 },
 });

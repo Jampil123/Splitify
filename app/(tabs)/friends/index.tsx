@@ -1,13 +1,13 @@
-﻿import { subscribeToConversations } from '@/services/api/chat';
-import { useFriends } from '@/services/hooks/useFriends';
+﻿import { useFriends } from '@/services/hooks/useFriends';
 import { usePresence } from '@/services/hooks/usePresence';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     FlatList,
     Image,
@@ -26,11 +26,10 @@ interface FriendCardProps {
     mutualGroups: number;
     avatar?: string | null;
     isOnline?: boolean;
-    unreadCount?: number;
     onChat?: () => void;
 }
 
-function FriendCard({ id, name, mutualGroups, avatar, isOnline, unreadCount = 0, onChat }: FriendCardProps) {
+function FriendCard({ id, name, mutualGroups, avatar, isOnline, onChat }: FriendCardProps) {
     return (
         <View style={styles.friendCard}>
             <View style={styles.avatarWrapper}>
@@ -55,13 +54,6 @@ function FriendCard({ id, name, mutualGroups, avatar, isOnline, unreadCount = 0,
             </View>
             <TouchableOpacity style={styles.chatButton} onPress={onChat}>
                 <Ionicons name="chatbubble-outline" size={20} color={colors.secondary} />
-                {unreadCount > 0 && (
-                    <View style={styles.chatBadge}>
-                        <Text style={styles.chatBadgeText}>
-                            {unreadCount > 99 ? '99+' : unreadCount}
-                        </Text>
-                    </View>
-                )}
             </TouchableOpacity>
         </View>
     );
@@ -188,22 +180,6 @@ export default function FriendsScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
-    const [unreadMap, setUnreadMap] = useState<Record<string, number>>({});
-
-    useEffect(() => {
-        if (!user?.id) return;
-        const unsub = subscribeToConversations(user.id, conversations => {
-            const map: Record<string, number> = {};
-            conversations.forEach(conv => {
-                const otherId = conv.participants.find(p => p !== user.id);
-                if (otherId) {
-                    map[otherId] = conv.unreadCount?.[user.id] ?? 0;
-                }
-            });
-            setUnreadMap(map);
-        });
-        return unsub;
-    }, [user?.id]);
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
@@ -293,7 +269,6 @@ export default function FriendsScreen() {
             mutualGroups={0}
             avatar={item.photoURL || undefined}
             isOnline={onlineMap[item.id] === true}
-            unreadCount={unreadMap[item.id] ?? 0}
             onChat={() => {
                 router.push({
                     pathname: '/chat/[friendId]',
@@ -392,7 +367,11 @@ export default function FriendsScreen() {
             </View>
 
             {/* Content */}
-            {activeTab === 'friends' ? (
+            {isLoading ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                </View>
+            ) : activeTab === 'friends' ? (
                 <FlatList
                     data={searchQuery.length > 1 ? searchResults : friends}
                     keyExtractor={(item) => item.id}
@@ -475,6 +454,11 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: colors.background,
+    },
+    loadingContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     header: {
         flexDirection: 'row',

@@ -1,5 +1,7 @@
 import { DropdownMenu } from '@/components/common/DropdownMenu';
-import { db } from '@/services/firebase/config';
+import { subscribeToGroupExpenses } from '@/services/api/expenses';
+import { subscribeToGroup } from '@/services/api/groups';
+import { subscribeToGroupSettlements } from '@/services/api/settlements';
 import { usePresence } from '@/services/hooks/usePresence';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
@@ -7,8 +9,7 @@ import { Group, GroupMember, Settlement } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { collection, doc, getDoc, getDocs, orderBy, query, where } from 'firebase/firestore';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -111,72 +112,45 @@ export default function GroupDetailsScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [userBalance, setUserBalance] = useState(0);
 
-    const fetchGroupData = useCallback(async () => {
-        if (!id) return;
-        
-        try {
-            // Fetch group data
-            const groupRef = doc(db, 'groups', id);
-            const groupSnap = await getDoc(groupRef);
-            
-            if (groupSnap.exists()) {
-                const groupData = { id: groupSnap.id, ...groupSnap.data() } as Group;
-                setGroup(groupData);
-                
-                // Calculate current user's balance; treat as 0 when group is fully settled
-                if (user?.id) {
-                    if (groupData.isFullySettled) {
-                        setUserBalance(0);
-                    } else {
-                        const currentMember = groupData.members.find(m => m.userId === user.id);
-                        setUserBalance(currentMember?.balance || 0);
-                    }
-                }
-            } else {
+    useEffect(() => {
+        if (!id || !user?.id) return;
+        setIsLoading(true);
+
+        const unsubGroup = subscribeToGroup(id, (groupData) => {
+            if (!groupData) {
                 Alert.alert('Error', 'Group not found');
                 router.back();
                 return;
             }
-            
-            // ✅ Fetch expenses from subcollection
-            const expensesRef = collection(db, 'groups', id, 'expenses');
-            const expensesQuery = query(
-                expensesRef,
-                where('isDeleted', '==', false),
-                orderBy('date', 'desc')
-            );
-            const expensesSnap = await getDocs(expensesQuery);
-            const expensesData = expensesSnap.docs.map(doc => ({ 
-                id: doc.id, 
-                ...doc.data() 
-            }));
-            setExpenses(expensesData);
-
-            // Fetch pending settlements
-            const settlementsSnap = await getDocs(
-                query(collection(db, 'groups', id, 'settlements'), where('status', '==', 'pending'))
-            );
-            setSettlements(settlementsSnap.docs.map(d => ({ id: d.id, ...d.data() }) as Settlement));
-
-        } catch (error) {
-            console.error('Error fetching group data:', error);
-            Alert.alert('Error', 'Failed to load group data');
-        } finally {
+            setGroup(groupData);
+            const member = groupData.members.find(m => m.userId === user!.id);
+            setUserBalance(groupData.isFullySettled ? 0 : (member?.balance || 0));
             setIsLoading(false);
             setRefreshing(false);
-        }
-    }, [id, user, router]);
+        });
 
-    useEffect(() => {
-        fetchGroupData();
-    }, [fetchGroupData]);
+        const unsubExpenses = subscribeToGroupExpenses(id, (expensesData) => {
+            setExpenses(expensesData.filter(e => !e.isDeleted && !e.isPayment));
+        });
+
+        const unsubSettlements = subscribeToGroupSettlements(id, (settlementsData) => {
+            setSettlements(settlementsData);
+        });
+
+        return () => {
+            unsubGroup();
+            unsubExpenses();
+            unsubSettlements();
+        };
+    }, [id, user?.id]);
 
     const memberIds = group?.members.map(m => m.userId) ?? [];
     const onlineMap = usePresence(memberIds);
 
     const onRefresh = () => {
         setRefreshing(true);
-        fetchGroupData();
+        // Subscriptions auto-update; dismiss spinner after a short visual pause
+        setTimeout(() => setRefreshing(false), 800);
     };
 
     const handleAddExpense = () => {

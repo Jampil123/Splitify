@@ -16,10 +16,11 @@ export function TabBar({ state, descriptors, navigation }: TabBarProps) {
         const iconMap: Record<string, { focused: string; unfocused: string }> = {
             'home/index': { focused: 'home', unfocused: 'home-outline' },
             'friends/index': { focused: 'people', unfocused: 'people-outline' },
+            'chat': { focused: 'chatbubbles', unfocused: 'chatbubbles-outline' },
             'notifications/index': { focused: 'notifications', unfocused: 'notifications-outline' },
             'profile/index': { focused: 'person', unfocused: 'person-outline' },
         };
-        
+
         const icons = iconMap[routeName] || { focused: 'apps', unfocused: 'apps-outline' };
         return isFocused ? icons.focused : icons.unfocused;
     };
@@ -28,6 +29,7 @@ export function TabBar({ state, descriptors, navigation }: TabBarProps) {
         const labelMap: Record<string, string> = {
             'home/index': 'Home',
             'friends/index': 'Friends',
+            'chat': 'Messages',
             'notifications/index': 'Alerts',
             'profile/index': 'Profile',
         };
@@ -53,7 +55,7 @@ export function TabBar({ state, descriptors, navigation }: TabBarProps) {
                     }
                 };
 
-                const showBadge = route.name === 'friends/index' && totalUnread > 0;
+                const showBadge = route.name === 'chat' && totalUnread > 0;
 
                 return (
                     <TouchableOpacity

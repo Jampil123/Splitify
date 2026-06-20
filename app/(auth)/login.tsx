@@ -1,4 +1,4 @@
-﻿import { loginWithEmail, signInWithGoogle } from '@/services/firebase/auth';
+﻿import { getCurrentUserData, loginWithEmail, signInWithGoogle } from '@/services/firebase/auth';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,7 +21,7 @@ import {
 
 export default function LoginScreen() {
     const router = useRouter();
-    const { setUser, setLoading: setStoreLoading } = useAuthStore();
+    const { setUser } = useAuthStore();
     
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -64,9 +64,11 @@ export default function LoginScreen() {
             const result = await loginWithEmail({ email, password });
 
             if (result.success && result.user) {
-                setTimeout(() => {
-                    router.replace('/home');
-                }, 500);
+                // Fetch the correct user document and populate the store
+                // BEFORE navigating — prevents stale persisted data from showing
+                const userData = await getCurrentUserData(result.user.uid);
+                setUser(userData);
+                router.replace('/home');
             } else {
                 setLoginError(result.error || 'Invalid email or password. Please try again.');
             }
@@ -78,24 +80,19 @@ export default function LoginScreen() {
     };
 
     const handleGoogleSignIn = async () => {
-        console.log('🔐 Login: Starting Google Sign In');
         setIsLoading(true);
-        
+
         try {
             const result = await signInWithGoogle();
-            console.log('🔐 Login: Google result', result.success, result.user?.uid);
-            
+
             if (result.success && result.user) {
-                setTimeout(() => {
-                    console.log('🔐 Login: Navigating to home');
-                    router.replace('/home');
-                }, 500);
+                const userData = await getCurrentUserData(result.user.uid);
+                setUser(userData);
+                router.replace('/home');
             } else {
-                console.log('🔐 Login: Google failed', result.error);
                 Alert.alert('Google Sign In Failed', result.error || 'Please try again');
             }
         } catch (error: any) {
-            console.error('🔐 Login: Google error', error);
             Alert.alert('Error', error.message || 'Something went wrong');
         } finally {
             setIsLoading(false);

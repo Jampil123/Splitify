@@ -1,13 +1,13 @@
 import { createNotification } from '@/services/api/notifications';
-import { db } from '@/services/firebase/config';
+import { markSettlementCompleted, subscribeToGroupSettlements } from '@/services/api/settlements';
+import { subscribeToGroup } from '@/services/api/groups';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
-import { Group, Settlement } from '@/types';
+import { Settlement } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { collection, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -26,6 +26,7 @@ function SettlementCard({
     currentUserId,
     fromPhotoURL,
     toPhotoURL,
+    isProcessing,
     onMarkPaid,
     onRemind,
 }: {
@@ -33,6 +34,7 @@ function SettlementCard({
     currentUserId: string;
     fromPhotoURL?: string | null;
     toPhotoURL?: string | null;
+    isProcessing: boolean;
     onMarkPaid: (id: string) => void;
     onRemind: (id: string) => void;
 }) {
@@ -77,10 +79,17 @@ function SettlementCard({
             </View>
             {settlement.status === 'pending' && isCreditor && (
                 <View style={styles.cardActions}>
-                    <TouchableOpacity style={styles.markPaidButton} onPress={() => onMarkPaid(settlement.id)}>
-                        <Text style={[typographyStyles.labelMedium, styles.markPaidText]}>Mark as Paid</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.remindButton} onPress={() => onRemind(settlement.id)}>
+                    {isProcessing ? (
+                        <View style={[styles.markPaidButton, styles.markPaidButtonDisabled]}>
+                            <ActivityIndicator size="small" color={colors.onPrimary} />
+                            <Text style={[typographyStyles.labelMedium, styles.markPaidText]}>Processing…</Text>
+                        </View>
+                    ) : (
+                        <TouchableOpacity style={styles.markPaidButton} onPress={() => onMarkPaid(settlement.id)}>
+                            <Text style={[typographyStyles.labelMedium, styles.markPaidText]}>Mark as Paid</Text>
+                        </TouchableOpacity>
+                    )}
+                    <TouchableOpacity style={styles.remindButton} onPress={() => onRemind(settlement.id)} disabled={isProcessing}>
                         <Text style={[typographyStyles.labelMedium, styles.remindText]}>Remind</Text>
                     </TouchableOpacity>
                 </View>
@@ -106,69 +115,52 @@ export default function SettlementsScreen() {
     const { id: groupId } = useLocalSearchParams<{ id: string }>();
     const { user } = useAuthStore();
     
-    const [group, setGroup] = useState<Group | null>(null);
     const [settlements, setSettlements] = useState<Settlement[]>([]);
     const [memberPhotoMap, setMemberPhotoMap] = useState<Record<string, string | null>>({});
     const [isLoading, setIsLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [totalAmount, setTotalAmount] = useState(0);
     const [pendingCount, setPendingCount] = useState(0);
+    const [processingId, setProcessingId] = useState<string | null>(null);
 
-    const fetchData = useCallback(async () => {
+    useEffect(() => {
         if (!groupId) return;
-        
-        try {
-            // Fetch group data
-            const groupRef = doc(db, 'groups', groupId);
-            const groupSnap = await getDoc(groupRef);
-            
-            if (groupSnap.exists()) {
-                const groupData = { id: groupSnap.id, ...groupSnap.data() } as Group;
-                setGroup(groupData);
-                const photoMap: Record<string, string | null> = {};
-                (groupData.members || []).forEach(m => { photoMap[m.userId] = m.photoURL || null; });
-                setMemberPhotoMap(photoMap);
-            } else {
+        setIsLoading(true);
+
+        const unsubGroup = subscribeToGroup(groupId, (groupData) => {
+            if (!groupData) {
                 Alert.alert('Error', 'Group not found');
                 router.back();
                 return;
             }
-            
-            // Fetch settlements from subcollection
-            const settlementsRef = collection(db, 'groups', groupId, 'settlements');
-            const q = query(settlementsRef, where('status', '==', 'pending'));
-            const settlementsSnap = await getDocs(q);
-            const settlementsData = settlementsSnap.docs.map(doc => ({ 
-                id: doc.id, 
-                ...doc.data() 
-            }) as Settlement);
-            
-            setSettlements(settlementsData);
-            
-            // Calculate totals
-            const total = settlementsData.reduce((sum, s) => sum + s.amount, 0);
-            setTotalAmount(total);
-            setPendingCount(settlementsData.length);
-            
-        } catch (error) {
-            console.error('Error fetching settlements:', error);
-            Alert.alert('Error', 'Failed to load settlements');
-        } finally {
+            const photoMap: Record<string, string | null> = {};
+            (groupData.members || []).forEach(m => { photoMap[m.userId] = m.photoURL || null; });
+            setMemberPhotoMap(photoMap);
             setIsLoading(false);
             setRefreshing(false);
-        }
-    }, [groupId, router]);
+        });
 
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+        const unsubSettlements = subscribeToGroupSettlements(groupId, (settlementsData) => {
+            setSettlements(settlementsData);
+            setTotalAmount(settlementsData.reduce((sum: number, s: Settlement) => sum + s.amount, 0));
+            setPendingCount(settlementsData.length);
+        });
+
+        return () => {
+            unsubGroup();
+            unsubSettlements();
+        };
+    }, [groupId]);
 
     const onRefresh = () => {
         setRefreshing(true);
-        fetchData();
+        setTimeout(() => setRefreshing(false), 800);
     };
 
     const handleMarkPaid = async (settlementId: string) => {
+        const settlement = settlements.find(s => s.id === settlementId);
+        if (!settlement) return;
+
         Alert.alert(
             'Mark as Paid',
             'Confirm that this payment has been completed?',
@@ -177,33 +169,16 @@ export default function SettlementsScreen() {
                 {
                     text: 'Confirm',
                     onPress: async () => {
-                        try {
-                            const settlementRef = doc(db, 'groups', groupId, 'settlements', settlementId);
-                            await updateDoc(settlementRef, {
-                                status: 'completed',
-                                completedAt: new Date(),
-                            });
-                            
-                            // Refresh settlements
-                            await fetchData();
-                            
-                            // Check if all settlements are now completed
-                            const remaining = settlements.filter(s => s.id !== settlementId && s.status === 'pending');
-                            if (remaining.length === 0) {
-                                // Update group isFullySettled
-                                const groupRef = doc(db, 'groups', groupId);
-                                await updateDoc(groupRef, {
-                                    isFullySettled: true,
-                                });
-                            }
-                            
+                        setProcessingId(settlementId);
+                        const ok = await markSettlementCompleted(groupId, settlement, {});
+                        setProcessingId(null);
+                        if (ok) {
                             Alert.alert('Success', 'Payment marked as completed!');
-                        } catch (error) {
-                            console.error('Error marking settlement:', error);
+                        } else {
                             Alert.alert('Error', 'Failed to mark payment');
                         }
-                    }
-                }
+                    },
+                },
             ]
         );
     };
@@ -288,6 +263,7 @@ export default function SettlementsScreen() {
                                 currentUserId={user?.id || ''}
                                 fromPhotoURL={memberPhotoMap[settlement.fromUserId]}
                                 toPhotoURL={memberPhotoMap[settlement.toUserId]}
+                                isProcessing={processingId === settlement.id}
                                 onMarkPaid={handleMarkPaid}
                                 onRemind={handleRemind}
                             />
@@ -485,15 +461,21 @@ const styles = StyleSheet.create({
     },
     markPaidButton: {
         flex: 1,
+        flexDirection: 'row',
         backgroundColor: colors.primary,
         paddingVertical: spacing.md,
         borderRadius: spacing.borderRadiusFull,
         alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.xs,
         shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,
         elevation: 4,
+    },
+    markPaidButtonDisabled: {
+        opacity: 0.7,
     },
     markPaidText: {
         color: colors.onPrimary,
