@@ -1,10 +1,15 @@
-﻿import { registerWithEmail, signInWithGoogle } from '@/services/firebase/auth';
+﻿import { getCurrentUserData, registerWithEmail } from '@/services/firebase/auth';
+import { signInWithGoogleCredential } from '@/services/firebase/googleAuth';
 import { useAuthStore } from '@/stores/authStore';
 import { colors, spacing, typographyStyles } from '@/styles';
 import { Ionicons } from '@expo/vector-icons';
+import * as Google from 'expo-auth-session/providers/google';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import * as WebBrowser from 'expo-web-browser';
+import { useEffect, useState } from 'react';
+
+WebBrowser.maybeCompleteAuthSession();
 import {
     ActivityIndicator,
     Alert,
@@ -22,7 +27,7 @@ import {
 export default function RegisterScreen() {
     const router = useRouter();
     const { setUser } = useAuthStore();
-    
+
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -39,6 +44,39 @@ export default function RegisterScreen() {
         confirmPassword: '',
         terms: '',
     });
+
+    const [, googleResponse, promptAsync] = Google.useAuthRequest({
+        webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+        androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    });
+
+    useEffect(() => {
+        if (googleResponse?.type === 'success') {
+            const { authentication } = googleResponse;
+            handleGoogleCredential(
+                authentication?.idToken ?? null,
+                authentication?.accessToken ?? null
+            );
+        }
+    }, [googleResponse]);
+
+    const handleGoogleCredential = async (idToken: string | null, accessToken: string | null) => {
+        setIsLoading(true);
+        try {
+            const result = await signInWithGoogleCredential(idToken, accessToken);
+            if (result.success && result.user) {
+                const userData = await getCurrentUserData(result.user.uid);
+                setUser(userData);
+                router.replace('/home');
+            } else {
+                Alert.alert('Google Sign In Failed', result.error || 'Please try again');
+            }
+        } catch (error: any) {
+            Alert.alert('Error', error.message || 'Something went wrong');
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const validateForm = () => {
         let isValid = true;
@@ -122,21 +160,8 @@ export default function RegisterScreen() {
         }
     };
 
-    const handleGoogleSignIn = async () => {
-        setIsLoading(true);
-        try {
-            const result = await signInWithGoogle();
-            
-            if (result.success && result.user) {
-                // router.replace('/(tabs)/home');
-            } else {
-                Alert.alert('Google Sign In Failed', result.error || 'Please try again');
-            }
-        } catch (error: any) {
-            Alert.alert('Error', error.message || 'Something went wrong');
-        } finally {
-            setIsLoading(false);
-        }
+    const handleGoogleSignIn = () => {
+        promptAsync();
     };
 
     const handleSignIn = () => {

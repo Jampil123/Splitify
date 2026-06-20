@@ -113,8 +113,21 @@ export default function RootLayout() {
                 }
 
                 try {
-                    const userData = await getCurrentUserData(firebaseUser.uid);
-                    setUser(userData);
+                    let userData = await getCurrentUserData(firebaseUser.uid);
+                    if (!userData) {
+                        // Firestore doc may not be ready yet right after sign-in — retry once
+                        await new Promise(r => setTimeout(r, 800));
+                        userData = await getCurrentUserData(firebaseUser.uid);
+                    }
+                    if (userData) {
+                        setUser(userData);
+                    } else {
+                        // Only clear if we don't already have matching user data
+                        const current = useAuthStore.getState().user;
+                        if (!current || current.id !== firebaseUser.uid) {
+                            setUser(null);
+                        }
+                    }
                 } catch (error) {
                     setUser(null);
                 }

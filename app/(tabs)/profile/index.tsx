@@ -271,7 +271,7 @@ export default function ProfileScreen() {
                         {user?.fullName || 'User'}
                     </Text>
                     <Text style={[typographyStyles.bodyMedium, styles.userEmail]}>
-                        {user?.email || 'user@example.com'}
+                        {user?.email || ''}
                     </Text>
                     <TouchableOpacity style={styles.editProfileButton} onPress={handleEditProfile}>
                         <Text style={styles.editProfileText}>Edit Profile</Text>

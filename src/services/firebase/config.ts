@@ -8,8 +8,8 @@ import {
     initializeAuth,
     onAuthStateChanged,
     sendPasswordResetEmail,
+    signInWithCredential,
     signInWithEmailAndPassword,
-    signInWithPopup,
     signOut,
     updateProfile
 } from 'firebase/auth';
@@ -111,8 +111,8 @@ export {
     // Storage helper (boolean value)
     isStorageAvailable, limit, onAuthStateChanged, orderBy,
     query, ref, sendPasswordResetEmail, serverTimestamp,
-    setDoc, signInWithEmailAndPassword,
-    signInWithPopup,
+    setDoc, signInWithCredential,
+    signInWithEmailAndPassword,
     signOut, startAfter,
     // Storage (may be null)
     storage, Timestamp,

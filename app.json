@@ -24,13 +24,14 @@
     },
     "plugins": [
       "expo-router",
+      "@react-native-google-signin/google-signin",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#F5FAFF",
           "android": {
-            "image": "./assets/icon/icon.png",
-            "imageWidth": 76
+            "image": "./assets/images/splitify-logo.png",
+            "imageWidth": 120
           }
         }
       ],

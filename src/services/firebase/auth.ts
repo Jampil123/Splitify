@@ -1,6 +1,6 @@
+import { LoginData, RegisterData, User } from '@/types';
 import {
     FirebaseUser,
-    GoogleAuthProvider,
     auth,
     createUserWithEmailAndPassword,
     db,
@@ -9,14 +9,11 @@ import {
     onAuthStateChanged,
     sendPasswordResetEmail,
     serverTimestamp,
-    setDoc, // ✅ ADD THIS - db was missing
+    setDoc,
     signInWithEmailAndPassword,
-    signInWithPopup,
     signOut,
     updateProfile,
 } from './config';
-
-import { LoginData, RegisterData, User } from '@/types';
 
 // ============ Authentication Methods ============
 
@@ -91,34 +88,6 @@ export async function registerWithEmail({ email, password, fullName }: RegisterD
         message = error.message;
     }
     return { success: false, user: null, error: message };
-  }
-}
-
-// Google Sign In
-export async function signInWithGoogle() {
-  try {
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    const user = result.user;
-    
-    // Check if user document exists
-    const userDoc = await getDoc(doc(db, 'users', user.uid));
-    
-    if (!userDoc.exists()) {
-      // Create new user document for first-time Google sign-in
-      await createUserDocument(user.uid, {
-        email: user.email!,
-        fullName: user.displayName || '',
-        photoURL: user.photoURL,
-      });
-    } else {
-      // Update last login
-      await updateUserLastLogin(user.uid);
-    }
-    
-    return { success: true, user, error: null };
-  } catch (error: any) {
-    return { success: false, user: null, error: error.message };
   }
 }
 
