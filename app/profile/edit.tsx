@@ -29,6 +29,17 @@ export default function EditProfileScreen() {
 
     const hasChanges = fullName.trim() !== originalName;
 
+    const performLogout = async () => {
+        const didLogout = await logout();
+        if (didLogout) {
+            router.replace('/(auth)/login');
+        } else if (Platform.OS === 'web') {
+            window.alert('Unable to log out. Please try again.');
+        } else {
+            Alert.alert('Logout Failed', 'Unable to log out. Please try again.');
+        }
+    };
+
     const handleSave = async () => {
         if (!fullName.trim()) {
             Alert.alert('Error', 'Name cannot be empty');
@@ -53,6 +64,13 @@ export default function EditProfileScreen() {
     };
 
     const handleLogout = () => {
+        if (Platform.OS === 'web') {
+            if (window.confirm('Are you sure you want to log out?')) {
+                void performLogout();
+            }
+            return;
+        }
+
         Alert.alert(
             'Logout',
             'Are you sure you want to log out?',
@@ -61,10 +79,7 @@ export default function EditProfileScreen() {
                 {
                     text: 'Logout',
                     style: 'destructive',
-                    onPress: async () => {
-                        await logout();
-                        router.replace('/(auth)/login');
-                    },
+                    onPress: () => { void performLogout(); },
                 },
             ]
         );

@@ -25,6 +25,23 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Deploy the web app to Vercel
+
+Import this repository as a Vercel project and use the repository root as the project root. The included `vercel.json` runs `npm run build:web` and publishes the Expo static export from `dist`.
+
+Add these environment variables in the Vercel project settings for each deployment environment:
+
+- `EXPO_PUBLIC_FIREBASE_API_KEY`
+- `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `EXPO_PUBLIC_FIREBASE_PROJECT_ID`
+- `EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET`
+- `EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+- `EXPO_PUBLIC_FIREBASE_APP_ID`
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+
+`EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID` is optional. These `EXPO_PUBLIC_` values are bundled into the web app, so they must not contain private secrets. After the first deployment, add the Vercel domain to Firebase Authentication's authorized domains.
+
 ## Get a fresh project
 
 When you're ready, run:

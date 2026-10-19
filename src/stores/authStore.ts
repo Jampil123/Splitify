@@ -14,7 +14,7 @@ interface AuthState {
   setUser: (user: User | null) => void;
   setLoading: (isLoading: boolean) => void;
   setError: (error: string | null) => void;
-  logout: () => Promise<void>;
+  logout: () => Promise<boolean>;
   refreshUserData: (userId: string) => Promise<void>;
   clearAuth: () => void;
 }
@@ -50,11 +50,17 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           const { logoutUser } = await import('@/services/firebase/auth');
-          await logoutUser();
+          const result = await logoutUser();
+          if (!result.success) {
+            set({ error: result.error, isLoading: false });
+            return false;
+          }
           set({ user: null, isAuthenticated: false, error: null, isLoading: false });
+          return true;
         } catch (error: any) {
           console.error('Logout error:', error);
           set({ error: error.message, isLoading: false });
+          return false;
         }
       },
       

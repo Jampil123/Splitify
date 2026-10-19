@@ -8,12 +8,10 @@
     "@expo/ui": "~56.0.18",
     "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@react-native-google-signin/google-signin": "^16.1.2",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
     "dotenv": "^17.4.2",
     "expo": "~56.0.12",
-    "expo-auth-session": "~56.0.14",
     "expo-build-properties": "~56.0.19",
     "expo-constants": "~56.0.18",
     "expo-dev-client": "~56.0.20",
@@ -28,7 +26,6 @@
     "expo-status-bar": "~56.0.4",
     "expo-symbols": "~56.0.6",
     "expo-system-ui": "~56.0.5",
-    "expo-web-browser": "~56.0.5",
     "firebase": "^12.14.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -52,6 +49,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "build:web": "expo export --platform web",
     "lint": "expo lint"
   },
   "private": true

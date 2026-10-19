@@ -4,7 +4,6 @@ import {
     User as FirebaseUser,
     getAuth,
     getReactNativePersistence,
-    GoogleAuthProvider,
     initializeAuth,
     onAuthStateChanged,
     sendPasswordResetEmail,
@@ -107,7 +106,7 @@ export {
     // Firestore
     db, deleteDoc, deleteObject, doc,
     getDoc,
-    getDocs, getDownloadURL, GoogleAuthProvider, increment,
+    getDocs, getDownloadURL, increment,
     // Storage helper (boolean value)
     isStorageAvailable, limit, onAuthStateChanged, orderBy,
     query, ref, sendPasswordResetEmail, serverTimestamp,

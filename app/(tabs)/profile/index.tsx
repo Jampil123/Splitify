@@ -12,6 +12,7 @@ import {
     Alert,
     Image,
     Modal,
+    Platform,
     ScrollView,
     StyleSheet,
     Switch,
@@ -147,7 +148,25 @@ export default function ProfileScreen() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
+    const performLogout = async () => {
+        const didLogout = await logout();
+        if (didLogout) {
+            router.replace('/(auth)/login');
+        } else if (Platform.OS === 'web') {
+            window.alert('Unable to log out. Please try again.');
+        } else {
+            Alert.alert('Logout Failed', 'Unable to log out. Please try again.');
+        }
+    };
+
     const handleLogout = () => {
+        if (Platform.OS === 'web') {
+            if (window.confirm('Are you sure you want to logout?')) {
+                void performLogout();
+            }
+            return;
+        }
+
         Alert.alert(
             'Logout',
             'Are you sure you want to logout?',
@@ -156,10 +175,7 @@ export default function ProfileScreen() {
                 {
                     text: 'Logout',
                     style: 'destructive',
-                    onPress: async () => {
-                        await logout();
-                        router.replace('/(auth)/login');
-                    },
+                    onPress: () => { void performLogout(); },
                 },
             ]
         );
