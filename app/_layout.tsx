@@ -9,7 +9,7 @@ import { colors } from '@/styles';
 import { Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold, Poppins_800ExtraBold, useFonts } from '@expo-google-fonts/poppins';
 import { Stack } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Text, View } from 'react-native';
 
 // Silence all console output in production builds
 if (!__DEV__) {
@@ -25,6 +25,21 @@ export default function RootLayout() {
     const { setUser, setLoading, user, isLoading: authIsLoading } = useAuthStore();
     const { setTotalUnread, showToast } = useChatStore();
     const [isAuthChecked, setIsAuthChecked] = useState(false);
+
+    useEffect(() => {
+        if (Platform.OS !== 'web') return;
+
+        const style = document.createElement('style');
+        style.textContent = `
+            input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]),
+            textarea {
+                font-size: 16px !important;
+            }
+        `;
+        document.head.appendChild(style);
+
+        return () => style.remove();
+    }, []);
 
     // Track previous lastMessageAt per conversation to detect new messages
     const prevLastAt = useRef<Record<string, number | null>>({});
